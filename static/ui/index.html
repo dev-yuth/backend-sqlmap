@@ -1,0 +1,642 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>sqlmap API UI</title>
+    <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/25/25231.png">
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <!-- html2pdf.js for PDF export (bundles html2canvas + jsPDF) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <style>
+        body {
+            background-color: #212529;
+            color: #e9ecef;
+        }
+
+        .card {
+            background-color: #343a40;
+            border: none;
+        }
+
+        .btn-custom {
+            background-color: #ced4da;
+            color: #212529;
+            font-weight: bold;
+        }
+
+        .btn-custom:hover {
+            background-color: #f8f9fa;
+            color: #212529;
+        }
+
+        pre {
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #343a40;
+            color: #e9ecef;
+            padding: 1rem;
+            border-radius: .5rem;
+        }
+
+        /* Modal specific changes for the new color scheme */
+        .modal-content {
+            background: #e9ecef !important;
+            color: #212529 !important;
+        }
+
+        /* New styles for the tables and parameter cards to ensure readability */
+        .table {
+            color: #e9ecef;
+        }
+
+        .table th,
+        .table td {
+            border-color: #6c757d;
+        }
+
+        .card .text-muted {
+            color: #adb5bd !important;
+        }
+
+        .card-body .small,
+        .card-body strong {
+            color: #e9ecef;
+        }
+
+        .btn-outline-secondary {
+            color: #ced4da;
+            border-color: #ced4da;
+        }
+
+        .btn-outline-secondary:hover {
+            color: #212529;
+            background-color: #ced4da;
+        }
+
+        .result-url-card {
+            background-color: #6c757d;
+        }
+    </style>
+</head>
+
+<body>
+    <div class="container py-4">
+        <h2 class="mb-3">sqlmap API UI</h2>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="row g-2 align-items-end">
+                    <div class="col-md">
+                        <label class="form-label small">API Endpoint</label>
+                        <input id="endpoint" class="form-control" value="http://localhost:5000/api/run-sqlmap">
+                    </div>
+                    <div class="col-auto">
+                        <button id="add" class="btn btn-custom">Add Item</button>
+                    </div>
+                    <div class="col-auto">
+                        <button id="send" class="btn btn-custom">Send Batch</button>
+                    </div>
+                    <div class="col-auto">
+                        <button id="viewResponse" class="btn btn-outline-light" data-bs-toggle="modal"
+                            data-bs-target="#responseModal">View Response</button>
+                    </div>
+                    <div class="col-auto">
+                        <button id="exportPdf" class="btn btn-outline-secondary" disabled>Export PDF</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="items"></div>
+    </div>
+
+    <template id="tpl">
+        <div class="card mb-3" data-item>
+            <div class="card-body">
+                <div class="row g-2 mb-2">
+                    <div class="col-md-6">
+                        <label class="form-label small">URL</label>
+                        <input data-url class="form-control" placeholder="http://localhost/...">
+                    </div>
+                    <div class="col-md-6">
+                        <label class="form-label small">Data (JSON)</label>
+                        <textarea data-data class="form-control"
+                            placeholder='{"idcard_usname":"1","password":"password"}'></textarea>
+                    </div>
+                </div>
+                <div class="d-flex justify-content-end">
+                    <button class="btn btn-danger btn-sm" data-remove>Remove</button>
+                </div>
+            </div>
+        </div>
+    </template>
+    <div class="container py-4">
+        <div id="tables"></div>
+    </div>
+
+    <div class="modal fade" id="responseModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">API Response</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="meta" class="small mb-2 text-muted"></div>
+                    <pre id="results"></pre>
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const $ = (s, e = document) => e.querySelector(s),
+            $$ = (s, e = document) => Array.from(e.querySelectorAll(s));
+        const items = $('#items');
+        let max_item = 2;
+        // keep last results for PDF export
+        let lastResults = null; // will hold array of per-item results
+
+        function updateAddBtn() {
+            const count = $$('#items [data-item]').length;
+            $('#add').disabled = count >= max_item;
+        }
+
+        function addItem() {
+            const current = $$('#items [data-item]').length;
+            if (current >= max_item) {
+                Swal.fire("Limit reached", "Maximum items: " + max_item, "warning");
+                updateAddBtn();
+                return;
+            }
+            const n = document.importNode($('#tpl').content, true);
+            const c = n.querySelector('[data-item]');
+            items.appendChild(n);
+            $('[data-remove]', c).onclick = () => { c.remove(); updateAddBtn(); };
+            updateAddBtn();
+        }
+
+        $('#add').onclick = () => addItem();
+
+        function safeParseJSON(txt) {
+            if (!txt) return undefined;
+            try { return JSON.parse(txt); } catch (e) { throw new Error('Invalid JSON: ' + e.message); }
+        }
+
+        function buildItem(card) {
+            const url = $('[data-url]', card).value.trim();
+            const dataTxt = $('[data-data]', card).value.trim();
+            if (!url) { throw new Error('URL is required'); }
+            const item = { url };
+            const data = safeParseJSON(dataTxt);
+            if (data) item.data = data;
+            return item;
+        }
+
+        /* --- helper: สร้างตาราง listDb --- */
+        function renderListDb(listDb) {
+            if (!listDb || !Array.isArray(listDb.names)) return '';
+            const container = document.createElement('div');
+            container.className = 'mb-3';
+
+            const header = document.createElement('h6');
+            header.textContent = `Databases (${listDb.count ?? listDb.names.length})`;
+            header.className = 'mb-2';
+            container.appendChild(header);
+
+            const table = document.createElement('table');
+            table.className = 'table table-sm table-bordered';
+            const thead = document.createElement('thead');
+            thead.innerHTML = `<tr><th>#</th><th>Database name</th></tr>`;
+            table.appendChild(thead);
+
+            const tbody = document.createElement('tbody');
+            listDb.names.forEach((n, i) => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `<td>${i + 1}</td><td>${n}</td>`;
+                tbody.appendChild(tr);
+            });
+            table.appendChild(tbody);
+            container.appendChild(table);
+            return container;
+        }
+
+        /* --- helper: สร้าง card สำหรับ parametersRaw --- */
+        function renderParameterCard(param) {
+            const card = document.createElement('div');
+            card.className = 'card mb-3';
+            card.style.background = 'transparent';
+
+            const body = document.createElement('div');
+            body.className = 'card-body';
+
+            const titleRow = document.createElement('div');
+            titleRow.className = 'd-flex justify-content-between align-items-start mb-2';
+
+            const title = document.createElement('div');
+            title.innerHTML = `<strong>${param.parameter}</strong> <span class="small text-muted">(${param.location})</span>`;
+            titleRow.appendChild(title);
+
+            // ปุ่ม copy raw
+            const btnGroup = document.createElement('div');
+            const copyBtn = document.createElement('button');
+            copyBtn.className = 'btn btn-sm btn-outline-secondary';
+            copyBtn.textContent = 'Copy raw';
+            copyBtn.onclick = () => {
+                navigator.clipboard.writeText(param.raw || '').then(() => {
+                    Swal.fire({ toast: true, position: 'top-end', timer: 1000, showConfirmButton: false, icon: 'success', title: 'Copied' });
+                }).catch(() => {
+                    Swal.fire("Error", "Cannot copy", "error");
+                });
+            };
+            btnGroup.appendChild(copyBtn);
+            titleRow.appendChild(btnGroup);
+
+            body.appendChild(titleRow);
+
+            // raw (pre)
+            if (param.raw) {
+                const pre = document.createElement('pre');
+                pre.style.whiteSpace = 'pre-wrap';
+                pre.textContent = param.raw;
+                body.appendChild(pre);
+            }
+
+            // findings (if any)
+            if (Array.isArray(param.findings) && param.findings.length) {
+                const fTitle = document.createElement('h6');
+                fTitle.className = 'mt-2 mb-2 small text-muted';
+                fTitle.textContent = `Findings (${param.findings.length})`;
+                body.appendChild(fTitle);
+
+                param.findings.forEach((f, idx) => {
+                    const fCard = document.createElement('div');
+                    fCard.className = 'mb-2 p-2';
+                    fCard.style.borderLeft = '4px solid rgba(255,255,255,0.1)';
+                    fCard.innerHTML = `
+            <div class="small"><strong>Type:</strong> ${f.type || '-'}</div>
+            <div class="small"><strong>Title:</strong> ${f.title || '-'}</div>
+            <div class="small"><strong>Payload:</strong></div>
+          `;
+                    const payloadPre = document.createElement('pre');
+                    payloadPre.style.whiteSpace = 'pre-wrap';
+                    payloadPre.className = 'mb-0';
+                    payloadPre.textContent = f.payload || '';
+                    fCard.appendChild(payloadPre);
+
+                    // ปุ่ม copy payload
+                    const copyP = document.createElement('button');
+                    copyP.className = 'btn btn-sm btn-outline-secondary mt-2';
+                    copyP.textContent = 'Copy payload';
+                    copyP.onclick = () => {
+                        navigator.clipboard.writeText(f.payload || '').then(() => {
+                            Swal.fire({ toast: true, position: 'top-end', timer: 1000, showConfirmButton: false, icon: 'success', title: 'Copied' });
+                        }).catch(() => Swal.fire("Error", "Cannot copy", "error"));
+                    };
+                    fCard.appendChild(copyP);
+
+                    body.appendChild(fCard);
+                });
+            }
+
+            card.appendChild(body);
+            return card;
+        }
+
+        /* --- helpers for Thai timestamp filename --- */
+        function thaiTimestampFilename(prefix = 'รายงาน_sqlmap') {
+            const d = new Date();
+            // Convert to Thailand time (client already in local TZ, but we format Thai style)
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const yyyyThai = d.getFullYear() + 543; // Buddhist Era
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            const ss = String(d.getSeconds()).padStart(2, '0');
+            return `${prefix}_${dd}-${mm}-${yyyyThai}_${hh}-${min}-${ss}.pdf`;
+        }
+
+        function thaiDateTimeHuman() {
+            const d = new Date();
+            const months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
+            const dd = String(d.getDate()).padStart(2, '0');
+            const mmName = months[d.getMonth()];
+            const yyyyThai = d.getFullYear() + 543;
+            const hh = String(d.getHours()).padStart(2, '0');
+            const min = String(d.getMinutes()).padStart(2, '0');
+            return `${dd} ${mmName} ${yyyyThai} เวลา ${hh}:${min} น.`;
+        }
+
+        /* --- build a printable DOM report from results --- */
+        function buildReportDom(resultsArr) {
+            const wrapper = document.createElement('div');
+            wrapper.style.padding = '16px';
+            wrapper.style.background = '#ffffff';
+            wrapper.style.color = '#000000';
+
+            // Cover / Header
+            const header = document.createElement('div');
+            header.style.borderBottom = '2px solid #333';
+            header.style.marginBottom = '12px';
+            const title = document.createElement('h2');
+            title.textContent = 'รายงานผลการสแกน sqlmap';
+            const ts = document.createElement('div');
+            ts.textContent = `จัดทำเมื่อ: ${thaiDateTimeHuman()}`;
+            ts.style.fontSize = '12px';
+            ts.style.color = '#333';
+            header.appendChild(title);
+            header.appendChild(ts);
+            wrapper.appendChild(header);
+
+            // Summary
+            const summary = document.createElement('div');
+            summary.style.fontSize = '12px';
+            summary.style.margin = '8px 0 16px 0';
+            const totalItems = resultsArr.length;
+            const totalDbNames = resultsArr.reduce((acc, r) => acc + ((r.listDb && Array.isArray(r.listDb.names)) ? r.listDb.names.length : 0), 0);
+            summary.innerHTML = `สรุปผล: จำนวนรายการ ${totalItems} | จำนวนชื่อฐานข้อมูลรวม ${totalDbNames}`;
+            wrapper.appendChild(summary);
+
+            // Each result as its own section with a page break
+            resultsArr.forEach((r, idx) => {
+                const sec = document.createElement('section');
+                sec.style.margin = '10px 0 12px 0';
+                if (idx > 0) sec.style.pageBreakBefore = 'always';
+
+                const h5 = document.createElement('h5');
+                h5.textContent = `รายการที่ ${idx + 1}`;
+                sec.appendChild(h5);
+
+                const urlP = document.createElement('div');
+                urlP.style.fontSize = '12px';
+                urlP.textContent = `URL: ${r.url || (Array.isArray(r.command) ? r.command.join(' ') : '')}`;
+                sec.appendChild(urlP);
+
+                // listDb (compact table)
+                if (r.listDb) {
+                    const dbWrap = document.createElement('div');
+                    const head = document.createElement('div');
+                    head.style.fontWeight = '600';
+                    head.style.margin = '6px 0';
+                    head.textContent = `ฐานข้อมูลที่พบ (${r.listDb.count ?? (r.listDb.names?.length || 0)})`;
+                    dbWrap.appendChild(head);
+
+                    const table = document.createElement('table');
+                    table.style.width = '100%';
+                    table.style.borderCollapse = 'collapse';
+                    table.style.fontSize = '11px';
+                    table.innerHTML = '<thead><tr><th style="border:1px solid #999;padding:4px;text-align:center;width:40px;">#</th><th style="border:1px solid #999;padding:4px;text-align:left;">Database name</th></tr></thead>';
+                    const tbody = document.createElement('tbody');
+                    (r.listDb.names || []).forEach((nm, i) => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `<td style="border:1px solid #999;padding:4px;text-align:center;">${i + 1}</td><td style="border:1px solid #999;padding:4px;">${nm}</td>`;
+                        tbody.appendChild(tr);
+                    });
+                    table.appendChild(tbody);
+                    dbWrap.appendChild(table);
+                    sec.appendChild(dbWrap);
+                }
+
+                // parametersRaw (compact table)
+                if (Array.isArray(r.parametersRaw) && r.parametersRaw.length) {
+                    const prHead = document.createElement('div');
+                    prHead.style.fontWeight = '600';
+                    prHead.style.margin = '10px 0 6px 0';
+                    prHead.textContent = 'รายละเอียดการตรวจสอบ (parametersRaw)';
+                    sec.appendChild(prHead);
+
+                    // Render each parameter as a bordered box with label/value lines (no table)
+                    r.parametersRaw.forEach(p => {
+                        const box = document.createElement('div');
+                        box.style.border = '1px solid #999';
+                        box.style.padding = '6px';
+                        box.style.marginBottom = '8px';
+                        box.style.fontSize = '10.5px';
+
+                        const mkRow = (label, value) => {
+                            const row = document.createElement('div');
+                            row.style.marginBottom = '4px';
+                            const lbl = document.createElement('div');
+                            lbl.textContent = label;
+                            lbl.style.fontWeight = '600';
+                            lbl.style.marginBottom = '2px';
+                            const val = document.createElement('div');
+                            val.textContent = value || '';
+                            val.style.whiteSpace = 'pre-wrap';
+                            val.style.wordBreak = 'break-word';
+                            val.style.overflowWrap = 'anywhere';
+                            row.appendChild(lbl);
+                            row.appendChild(val);
+                            return row;
+                        };
+
+                        const types = (p.findings || []).map(f => f.type || '').join('\n');
+                        const titles = (p.findings || []).map(f => f.title || '').join('\n');
+                        const payloads = (p.findings || []).map(f => f.payload || '').join('\n');
+
+                        box.appendChild(mkRow('Parameter', p.parameter));
+                        box.appendChild(mkRow('Location', p.location));
+                        if (types) box.appendChild(mkRow('Type', types));
+                        if (titles) box.appendChild(mkRow('Title', titles));
+                        if (payloads) box.appendChild(mkRow('Payload', payloads));
+
+                        sec.appendChild(box);
+                    });
+                }
+
+                wrapper.appendChild(sec);
+            });
+
+            return wrapper;
+        }
+
+        /* --- export to PDF --- */
+        async function exportReportPdf() {
+            if (!lastResults || !lastResults.length) {
+                Swal.fire('ไม่มีข้อมูล', 'กรุณาเรียกใช้งานและให้มีผลลัพธ์ก่อน', 'warning');
+                return;
+            }
+            const reportDom = buildReportDom(lastResults);
+            const opt = {
+                margin: 10,
+                filename: thaiTimestampFilename(),
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+            };
+            try {
+                const worker = html2pdf().set(opt).from(reportDom).toPdf();
+                const pdf = await worker.get('pdf');
+                // Footer page numbers
+                const pageCount = pdf.internal.getNumberOfPages();
+                pdf.setFontSize(9);
+                for (let i = 1; i <= pageCount; i++) {
+                    pdf.setPage(i);
+                    const w = pdf.internal.pageSize.getWidth();
+                    const h = pdf.internal.pageSize.getHeight();
+                    pdf.text(`หน้า ${i} / ${pageCount}`, w - 20, h - 8, { align: 'right' });
+                }
+                pdf.save(opt.filename);
+            } catch (e) {
+                Swal.fire('Error', 'ไม่สามารถสร้างไฟล์ PDF ได้: ' + e.message, 'error');
+            }
+        }
+
+        /* --- main send handler (fetch + render) --- */
+        $('#send').onclick = async () => {
+            const ep = $('#endpoint').value.trim() || 'http://localhost:5000/api/run-sqlmap';
+            $('#meta').textContent = 'Sending...';
+            $('#results').textContent = '';
+            $('#tables').innerHTML = ''; // Clear previous results
+            $('#exportPdf').disabled = true;
+            try {
+                const body = $$('#items [data-item]').map(buildItem);
+
+                Swal.fire({
+                    title: 'Processing...',
+                    text: 'Please wait while sqlmap is running',
+                    allowOutsideClick: false,
+                    didOpen: () => { Swal.showLoading(); }
+                });
+
+                const res = await fetch(ep, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(body)
+                });
+
+                const json = await res.json();
+                Swal.close();
+
+                $('#meta').textContent = 'HTTP ' + res.status + ' | ok=' + (json.ok ?? false);
+                $('#results').textContent = JSON.stringify(json, null, 2);
+
+                // Add new section to render parsed data
+                if (json.ok && Array.isArray(json.results)) {
+                    lastResults = json.results;
+                    json.results.forEach(result => {
+                        const resultContainer = document.createElement('div');
+                        resultContainer.className = 'card p-3 mb-4 result-url-card';
+                        resultContainer.innerHTML = `<h5 class="mb-3">URL: ${result.url}</h5>`;
+
+                        // Render listDb
+                        if (result.listDb) {
+                            const dbTable = renderListDb(result.listDb);
+                            resultContainer.appendChild(dbTable);
+                        }
+
+                        // Render parametersRaw
+                        if (result.parametersRaw) {
+                            const paramsHeading = document.createElement('h6');
+                            paramsHeading.textContent = 'SQL Injection Findings';
+                            paramsHeading.className = 'mt-4 mb-2';
+                            resultContainer.appendChild(paramsHeading);
+                            result.parametersRaw.forEach(param => {
+                                const paramCard = renderParameterCard(param);
+                                resultContainer.appendChild(paramCard);
+                            });
+                        }
+
+                        $('#tables').appendChild(resultContainer);
+                    });
+                    // enable export button now that we have results
+                    $('#exportPdf').disabled = false;
+                }
+
+
+
+                // Open modal automatically
+                const modalEl = document.getElementById('responseModal');
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+
+                // สร้างไฟล์ PDF
+                //exportReportPdf(); เก็บไว้ใน C:\Users\yooth\Desktop\sqlmap_dbs\sqlmap-api-py\files เลย  
+
+                // สร้างไฟล์ PDF อัตโนมัติ และอัปโหลดไปเก็บในโฟลเดอร์ /files บนเซิร์ฟเวอร์
+
+                if (lastResults && lastResults.length) {
+                    try {
+                        console.log('[autocreatefile] start');
+                        await autocreatefile(lastResults); // ensure the upload finishes
+                        console.log('[autocreatefile] done');
+                    } catch (err) {
+                        console.warn('[autocreatefile] failed:', err);
+                    }
+                }
+
+
+
+            } catch (e) {
+                Swal.close();
+                Swal.fire("Error", e.message, "error");
+            }
+        };
+        // เก็บไฟล์ลง Origin Private File System (ไม่โหลดออกมา)
+        // สร้างไฟล์ PDF แล้วส่งให้เซิร์ฟเวอร์บันทึกในโฟลเดอร์ /files (ไม่ดาวน์โหลด)
+        async function autocreatefile(resultsArr) {
+            if (!resultsArr || !resultsArr.length) return;
+            try {
+                console.log('[autocreatefile] generating pdf...');
+
+                // ใช้ buildReportDom เหมือนกันกับ exportReportPdf
+                const reportDom = buildReportDom(resultsArr);
+
+                // ใช้ options เดียวกับ exportReportPdf
+                const opt = {
+                    margin: 10,
+                    // exportReportPdf ตั้ง filename ไว้เพราะจะ pdf.save() แต่ที่นี่เราจะอัปโหลดแทน
+                    // หากต้องการตั้งชื่อในฝั่งเซิร์ฟเวอร์ เราจะใช้ thaiTimestampFilename() ตอนอัปโหลด
+                    image: { type: 'jpeg', quality: 0.98 },
+                    html2canvas: { scale: 2, useCORS: true },
+                    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+                };
+
+                const worker = html2pdf().set(opt).from(reportDom).toPdf();
+                const pdf = await worker.get('pdf');
+
+                // ใส่เลขหน้าแบบเดียวกับ exportReportPdf
+                const pageCount = pdf.internal.getNumberOfPages();
+                pdf.setFontSize(9);
+                for (let i = 1; i <= pageCount; i++) {
+                    pdf.setPage(i);
+                    const w = pdf.internal.pageSize.getWidth();
+                    const h = pdf.internal.pageSize.getHeight();
+                    pdf.text(`หน้า ${i} / ${pageCount}`, w - 20, h - 8, { align: 'right' });
+                }
+
+                // แปลงเป็น Blob แล้วอัปโหลด เก็บฝั่งเซิร์ฟเวอร์ (files/)
+                const blob = pdf.output('blob');
+                const filename = thaiTimestampFilename();
+
+                console.log('[autocreatefile] uploading to /api/upload-report ...', filename);
+                const res = await fetch('/api/upload-report?filename=' + encodeURIComponent(filename), {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/pdf' }, // ห้ามส่ง X-Filename ที่มีอักขระไทยเพื่อกัน error
+                    body: blob
+                });
+                const json = await res.json().catch(() => ({}));
+                if (!res.ok || !json.ok) {
+                    console.warn('[autocreatefile] upload failed', res.status, json);
+                    throw new Error('Upload failed: ' + (json.error || res.statusText));
+                }
+                console.log('[autocreatefile] saved at', json.path);
+            } catch (e) {
+                console.warn('[autocreatefile] error:', e);
+                throw e;
+            }
+        }
+        // hook up export button
+        $('#exportPdf').onclick = exportReportPdf;
+    </script>
+</body>
+
+</html>
