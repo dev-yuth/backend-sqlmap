@@ -5,7 +5,7 @@ from .extensions import db, jwt, cors, migrate
 from .routes import register_routes
 
 def create_app(config_object: object | None = None):
-    app = Flask(__name__, static_folder="../static", static_url_path="/static")
+    app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.config.from_object(config_object or Config)
 
     # init extensions

@@ -1,3 +1,4 @@
+# app/models/user.py
 from datetime import datetime
 from app.extensions import db
 from werkzeug.security import generate_password_hash, check_password_hash
