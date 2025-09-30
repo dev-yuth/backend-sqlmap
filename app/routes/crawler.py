@@ -10,25 +10,24 @@ import os
 from dotenv import load_dotenv
 import re
 
-# for dedupe / similarity
+# สำหรับ dedupe / similarity
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 load_dotenv()  # โหลดตัวแปรจาก .env
 
 # อ่านค่า default
-
 DEFAULT_DEDUPE_THRESHOLD = float(os.getenv("CRAWLER_DEDUPE_THRESHOLD", 0.85))
 DEFAULT_MAX_PAGES = int(os.getenv("CRAWLER_MAX_PAGES", 500))
 DEFAULT_CONCURRENCY = int(os.getenv("CRAWLER_CONCURRENCY", 20))
 
 bp = Blueprint("crawler", __name__, url_prefix="/api/crawler")
 
-# tracking params to drop when normalizing
+# tracking params ที่ต้องละเว้นเวลาทำ normalization
 TRACKING_PARAMS_RE = re.compile(r'^(utm_|fbclid$|gclid$|sessionid$|phpsessid$)', re.IGNORECASE)
 
 # -------------------------
-# Async crawler
+# 1. Data Collection → เก็บข้อมูลเอกสาร/URL
 # -------------------------
 async def _fetch(session, url, timeout=10):
     try:
@@ -64,6 +63,10 @@ async def _crawl_async(start_url, max_pages=500, concurrency=20):
                     to_visit.task_done()
                     continue
                 results.append(url)
+                
+                # -------------------------
+                # 1a. เก็บลิงก์ภายในเพื่อติดตามต่อ
+                # -------------------------
                 soup = BeautifulSoup(html, "html.parser")
                 for a in soup.find_all("a", href=True):
                     href = a.get("href").strip()
@@ -86,7 +89,7 @@ async def _crawl_async(start_url, max_pages=500, concurrency=20):
         return list(dict.fromkeys(results))
 
 # -------------------------
-# URL normalization / dedupe
+# 2. Normalization → ทำให้รูปแบบเหมือนกัน
 # -------------------------
 def normalize_url(u: str) -> str:
     try:
@@ -103,12 +106,16 @@ def normalize_url(u: str) -> str:
 
     path = p.path or "/"
     q = parse_qsl(p.query, keep_blank_values=True)
+    # ลบ tracking params
     q_filtered = [(k, v) for (k, v) in q if not TRACKING_PARAMS_RE.match(k)]
     q_filtered.sort(key=lambda kv: (kv[0], kv[1]))
     query = urlencode(q_filtered, doseq=True)
 
     return urlunparse((scheme, netloc, path, "", query, ""))
 
+# -------------------------
+# 3. Feature Extraction / Signature → แปลงเป็นข้อความสำหรับเทียบ
+# -------------------------
 def url_to_text_signature(u: str) -> str:
     """
     ใช้เฉพาะ path + ชื่อ query param (ไม่เอาค่า) เพื่อรวม URLs คล้ายกัน
@@ -122,6 +129,9 @@ def url_to_text_signature(u: str) -> str:
         tokens = [p.netloc]
     return " ".join(tokens)
 
+# -------------------------
+# 4. Similarity Calculation + 5. Clustering / Deduplication
+# -------------------------
 def dedupe_urls_by_tfidf(urls, threshold=0.85):
     if not urls:
         return [], {}
@@ -148,6 +158,10 @@ def dedupe_urls_by_tfidf(urls, threshold=0.85):
                 assigned[j] = True
                 cluster_idxs.append(j)
         cluster_urls = [normalized[k] for k in cluster_idxs]
+        
+        # -------------------------
+        # 6. Representative Selection → เลือก URL ตัวแทน
+        # -------------------------
         rep = min(cluster_urls, key=lambda s: (len(s), s))
         groups[rep] = [urls[k] for k in cluster_idxs]
         representatives.append(rep)
@@ -155,7 +169,7 @@ def dedupe_urls_by_tfidf(urls, threshold=0.85):
     return representatives, groups
 
 # -------------------------
-# Flask route
+# 7. Output / Reporting → ส่งผลลัพธ์ cleaned URLs + mapping
 # -------------------------
 @bp.route("/scan", methods=["POST"])
 @jwt_required()
