@@ -1,3 +1,4 @@
+# app/routes/auth.py
 from flask import Blueprint, request, jsonify
 from app.extensions import db, jwt
 from app.models.user import User
@@ -32,21 +33,22 @@ def login():
     user = User.query.filter((User.username==identifier) | (User.email==identifier)).first()
     if not user or not user.check_password(password):
         return {"msg":"invalid credentials"}, 401
-    access = create_access_token(identity=user.id)
-    refresh = create_refresh_token(identity=user.id)
+    access = create_access_token(identity=str(user.id))
+    refresh = create_refresh_token(identity=str(user.id))
     return {"access_token": access, "refresh_token": refresh, "user": user.to_dict()}
 
 @bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)
 def refresh():
-    identity = get_jwt_identity()
+    identity = get_jwt_identity()   # ได้เป็น string อยู่แล้ว
     access = create_access_token(identity=identity)
     return {"access_token": access}
 
 @bp.route("/logout", methods=["POST"])
-@jwt_required()
+@jwt_required(verify_type=False)  # จะรับได้ทั้ง access และ refresh
 def logout():
     jti = get_jwt()["jti"]
-    db.session.add(TokenBlocklist(jti=jti, token_type="access"))
+    token_type = get_jwt()["type"]  # access หรือ refresh
+    db.session.add(TokenBlocklist(jti=jti, token_type=token_type))
     db.session.commit()
-    return {"msg":"logged out"}
+    return {"msg": f"{token_type} token revoked"}

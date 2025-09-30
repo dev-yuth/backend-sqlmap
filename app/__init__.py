@@ -1,7 +1,7 @@
 # app/__init__.py
 from flask import Flask
 from .config import Config
-from .extensions import db, jwt  # import jwt
+from .extensions import db, jwt, cors, migrate
 from .routes import register_routes
 
 def create_app(config_object: object | None = None):
@@ -10,9 +10,11 @@ def create_app(config_object: object | None = None):
 
     # init extensions
     db.init_app(app)
-    jwt.init_app(app)  # <-- เพิ่ม JWTManager
+    migrate.init_app(app, db)
+    jwt.init_app(app)
+    cors.init_app(app, origins=app.config['CORS_ORIGINS'])
 
-    # register blueprints หลังจาก extensions init
+    # register blueprints
     register_routes(app)
 
     return app
