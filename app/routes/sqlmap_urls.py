@@ -17,6 +17,11 @@ from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
 from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import cm
+
+from flask_jwt_extended import jwt_required
 
 bp = Blueprint("sqlmap_urls", __name__)
 
@@ -232,62 +237,99 @@ def _run_cmd(cmd: List[str], timeout_seconds: int) -> Dict[str, Any]:
         "listDb": list_db_minimal,
     }
 
-# --- PDF generation ---
+# --- Register Thai font ---
+THAI_FONT_NAME = "THSarabunNew"
+try:
+    pdfmetrics.registerFont(TTFont(THAI_FONT_NAME, "THSarabunNew.ttf"))
+except Exception as e:
+    print(f"Warning: Thai font registration failed: {e}")
+
+def thai_datetime_str():
+    months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+              'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+    d = datetime.datetime.now()
+    return f"{d.day:02d} {months[d.month-1]} {d.year+543} เวลา {d.hour:02d}:{d.minute:02d} น."
+
 def generate_pdf_report(results: List[Dict[str, Any]]) -> str:
-    styles = getSampleStyleSheet()
-    story = []
-
-    story.append(Paragraph("SQLMap Scan Report", styles["Title"]))
-    story.append(Spacer(1, 12))
-    story.append(Paragraph(f"Generated: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles["Normal"]))
-    story.append(Spacer(1, 24))
-
-    for r in results:
-        story.append(Paragraph(f"Target URL: {r['url']}", styles["Heading2"]))
-        story.append(Paragraph(f"Status: {'OK' if r['ok'] else 'FAILED'}", styles["Normal"]))
-        story.append(Spacer(1, 12))
-
-        list_db = r.get("listDb", {})
-        db_names = list_db.get("names", [])
-        db_count = list_db.get("count", 0)
-
-        story.append(Paragraph(f"Databases Found ({db_count}):", styles["Heading3"]))
-        if db_names:
-            data = [[i+1, name] for i, name in enumerate(db_names)]
-            table = Table([["#", "Database"]] + data, colWidths=[30, 200])
-            table.setStyle(TableStyle([
-                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-                ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-            ]))
-            story.append(table)
-        else:
-            story.append(Paragraph("No databases found.", styles["Normal"]))
-        story.append(Spacer(1, 12))
-
-        params = r.get("parametersRaw", [])
-        story.append(Paragraph("Parameters Analysis:", styles["Heading3"]))
-        if params:
-            for p in params:
-                story.append(Paragraph(f"Parameter: {p.get('parameter')} (Location: {p.get('location')})", styles["Normal"]))
-                for f in p.get("findings", []):
-                    story.append(Paragraph(f"- Type: {f.get('type')}", styles["Normal"]))
-                    story.append(Paragraph(f"  Title: {f.get('title')}", styles["Normal"]))
-                    story.append(Paragraph(f"  Payload: {f.get('payload')}", styles["Code"]))
-                story.append(Spacer(1, 12))
-        else:
-            story.append(Paragraph("No injection parameters found.", styles["Normal"]))
-
-        story.append(Spacer(1, 24))
+    from reportlab.platypus import Paragraph, Spacer, Table, TableStyle, PageBreak, SimpleDocTemplate
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import colors
+    import os, datetime
 
     output_dir = os.path.join(os.getcwd(), "app", "files")
     os.makedirs(output_dir, exist_ok=True)
     pdf_path = os.path.join(output_dir, f"sqlmap_report_{int(datetime.datetime.now().timestamp())}.pdf")
-    doc = SimpleDocTemplate(pdf_path, pagesize=A4)
+
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    styles = getSampleStyleSheet()
+    # Override default fonts
+    for key in styles.byName:
+        styles[key].fontName = THAI_FONT_NAME
+
+    story = []
+
+    # --- Header ---
+    story.append(Paragraph("รายงานผลการสแกน SQLMap", styles["Title"]))
+    story.append(Paragraph(f"จัดทำเมื่อ: {thai_datetime_str()}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+
+    # --- Summary ---
+    total_items = len(results)
+    total_db_names = sum(len(r.get("listDb", {}).get("names", [])) for r in results)
+    story.append(Paragraph(f"สรุปผล: จำนวนรายการ {total_items} | จำนวนฐานข้อมูลรวม {total_db_names}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+
+    # --- Details per URL ---
+    for idx, r in enumerate(results, 1):
+        story.append(Paragraph(f"รายการที่ {idx}: {r.get('url','')}", styles["Heading2"]))
+        story.append(Paragraph(f"สถานะ: {'OK' if r.get('ok') else 'FAILED'}", styles["Normal"]))
+        story.append(Spacer(1, 6))
+
+        # --- Databases ---
+        list_db = r.get("listDb", {})
+        db_names = list_db.get("names", [])
+        db_count = list_db.get("count", 0)
+
+        story.append(Paragraph(f"ฐานข้อมูลที่พบ ({db_count}):", styles["Heading3"]))
+        if db_names:
+            data = [["#", "Database Name"]] + [[str(i+1), name] for i, name in enumerate(db_names)]
+            table = Table(data, colWidths=[1.2*cm, 14*cm])
+            table.setStyle(TableStyle([
+                ("GRID", (0,0), (-1,-1), 0.5, colors.black),
+                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                ("FONTNAME", (0,0), (-1,-1), THAI_FONT_NAME),
+                ("FONTSIZE", (0,0), (-1,-1), 10),
+            ]))
+            story.append(table)
+        else:
+            story.append(Paragraph("ไม่พบฐานข้อมูล", styles["Normal"]))
+        story.append(Spacer(1, 6))
+
+        # --- Parameters ---
+        params = r.get("parametersRaw", [])
+        story.append(Paragraph("รายละเอียดพารามิเตอร์:", styles["Heading3"]))
+        if params:
+            for p in params:
+                story.append(Paragraph(f"Parameter: {p.get('parameter')} (Location: {p.get('location')})", styles["Normal"]))
+                for f in p.get("findings", []):
+                    story.append(Paragraph(f"- Type: {f.get('type','')}", styles["Normal"]))
+                    story.append(Paragraph(f"  Title: {f.get('title','')}", styles["Normal"]))
+                    story.append(Paragraph(f"  Payload: {f.get('payload','')}", styles["Normal"]))
+                story.append(Spacer(1, 6))
+        else:
+            story.append(Paragraph("ไม่พบพารามิเตอร์ที่มีช่องโหว่", styles["Normal"]))
+
+        story.append(PageBreak())
+
     doc.build(story)
     return pdf_path
 
 # --- endpoint: POST /api/run-sqlmap-urls ---
 @bp.route("/api/run-sqlmap-urls", methods=["POST"])
+@jwt_required()
 def run_sqlmap_urls_post():
     python_path = get_python_path()
     sqlmap_path = get_sqlmap_path()
@@ -315,6 +357,8 @@ def run_sqlmap_urls_post():
     raw_urls = body.get("cleaned_urls") or []
     if not isinstance(raw_urls, list) or not raw_urls:
         return {"ok": False, "error": "Missing or invalid 'cleaned_urls' (must be non-empty list)."}, 400
+
+    create_pdf = body.get("createPdf", False)  # <--- new flag, default False
 
     try:
         requested = body.get("maxConcurrency")
@@ -362,7 +406,7 @@ def run_sqlmap_urls_post():
     status_code = 200 if all_ok else 207
 
     report_pdf_path = None
-    if status_code == 200:
+    if create_pdf:  # <--- only generate PDF if flag is True
         try:
             report_pdf_path = generate_pdf_report(results_sorted)
         except Exception as e:

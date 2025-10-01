@@ -27,3 +27,7 @@ def admin_dashboard():
 @bp.route("/user/dashboard")
 def user_dashboard():
     return render_template("user_dashboard.html")
+    
+@bp.route("/sqlmap_urls")
+def sqlmap_urls():
+    return render_template("sqlmap_ulrs.html")

@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <title>SQLMap Scanner — Step Progress</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+  <style>
+    /* --- Stepper (pure CSS) --- */
+    .steps { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+    .step { display:flex; flex-direction: column; align-items:center; width: 12rem; text-align: center; }
+    .step-circle { width:48px; height:48px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; color:#fff; background: #d1d5db; transition: background .25s ease, transform .15s ease; box-shadow: 0 2px 6px rgba(0,0,0,0.06); }
+    .step-label { font-size:0.95rem; margin-top:0.5rem; color:#374151; }
+    .step.active .step-circle { background: linear-gradient(90deg,#0ea5a4,#06b6d4); transform: translateY(-4px); }
+    .step.done .step-circle { background: linear-gradient(90deg,#10b981,#34d399); }
+
+    .progress-wrap { width:100%; background:#e6edf0; border-radius: 999px; overflow:hidden; height: 18px; margin-bottom: 0.75rem; box-shadow: inset 0 1px 2px rgba(0,0,0,0.04); }
+    .progress-fill { width:0%; height:100%; background: linear-gradient(90deg,#6366f1,#8b5cf6); transition: width .35s ease; display:flex; align-items:center; justify-content:center; color: white; font-weight:600; font-size:0.85rem; }
+
+    .url-list { max-height: 280px; overflow:auto; border:1px solid #e6edf0; padding:0.5rem; border-radius:6px; background:#fff; }
+    .url-item { display:flex; gap:0.75rem; align-items:center; padding:0.35rem 0.25rem; border-bottom:1px dashed #f1f5f9; }
+    .url-item:last-child { border-bottom: none; }
+    .url-status { min-width:95px; text-align:center; font-weight:600; font-size:0.85rem; padding:4px 8px; border-radius:6px; color:#fff; }
+    .status-pending { background:#9ca3af; }
+    .status-running { background:#06b6d4; }
+    .status-ok { background:#10b981; }
+    .status-fail { background:#ef4444; }
+    .small-muted { font-size:0.85rem; color:#6b7280; }
+
+    @media (max-width:640px) { .step { width: 48%; } }
+  </style>
+</head>
+<body class="bg-light">
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <h4 class="m-0">SQLMap Scanner — Step-by-step Progress</h4>
+    <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Logout</button>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body">
+      <label class="form-label">ใส่ URL เริ่มต้น (หน้า root สำหรับ crawler)</label>
+      <div class="input-group">
+        <input id="startUrl" class="form-control" placeholder="https://example.com" />
+        <button id="scanBtn" class="btn btn-primary">Start Scan</button>
+      </div>
+      <div class="form-text small-muted">ระบบจะ crawl, dedupe แล้วสแกนแต่ละ URL ทีละตัว (หรือขนานได้) และแสดงความคืบหน้าแบบ step-by-step</div>
+    </div>
+  </div>
+
+  <div class="steps" id="stepsRoot">
+    <div class="step" id="step-crawl"><div class="step-circle">1</div><div class="step-label">Scan URL</div></div>
+    <div class="step" id="step-sqlmap"><div class="step-circle">2</div><div class="step-label">Run SQLMap</div></div>
+    <div class="step" id="step-pdf"><div class="step-circle">3</div><div class="step-label">Generate PDF</div></div>
+    <div class="step" id="step-done"><div class="step-circle">4</div><div class="step-label">Finished</div></div>
+  </div>
+
+  <div class="mb-3">
+    <div class="progress-wrap">
+      <div id="progressFill" class="progress-fill">0%</div>
+    </div>
+    <div class="small-muted" id="stageMsg">Ready</div>
+  </div>
+
+  <div class="row">
+    <div class="col-md-7 mb-3">
+      <div class="card">
+        <div class="card-header">URLs to scan</div>
+        <div class="card-body">
+          <div class="small-muted mb-2">รายการ URL ที่ได้จาก crawler / dedupe</div>
+          <div id="urlList" class="url-list"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-md-5 mb-3">
+      <div class="card">
+        <div class="card-header">Activity Log</div>
+        <div class="card-body" style="min-height:200px;">
+          <div id="activityLog" class="small-muted" style="white-space:pre-wrap;"></div>
+        </div>
+        <div class="card-footer text-end">
+          <a id="downloadPdfBtn" class="btn btn-success btn-sm d-none" target="_blank">ดาวน์โหลด PDF</a>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="d-flex gap-2">
+    <button id="cancelBtn" class="btn btn-outline-danger btn-sm ms-auto d-none">Cancel</button>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+const log = (txt) => { const el = $('activityLog'); el.textContent = (new Date()).toLocaleTimeString() + "  " + txt + "\n" + el.textContent; };
+const setStep = (name, state) => { const el = $('step-'+name); el.classList.remove('active','done'); if(state==='active') el.classList.add('active'); if(state==='done') el.classList.add('done'); };
+const setStageMsg = (s) => $('stageMsg').textContent = s;
+const setOverallProgress = (percent) => { const pf = $('progressFill'); const p = Math.max(0, Math.min(100, Math.round(percent))); pf.style.width = p + '%'; pf.textContent = p + '%'; };
+const getAuthHeaders = () => { const token = localStorage.getItem('access_token'); if(!token) return null; return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }; };
+
+let abortRequested = false;
+$('logoutBtn').addEventListener('click', () => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); window.location.href = '/login'; });
+$('cancelBtn').addEventListener('click', () => { abortRequested=true; $('cancelBtn').classList.add('d-none'); log('Cancel requested — stopping after current jobs finish.'); });
+
+$('scanBtn').addEventListener('click', async () => {
+  abortRequested = false;
+  const startUrl = $('startUrl').value.trim();
+  if(!startUrl) { alert('กรุณาใส่ start URL'); return; }
+
+  const auth = getAuthHeaders();
+  if(!auth) { alert('กรุณา login ก่อน'); return window.location.href = '/login'; }
+
+  // disable scan while running
+  $('scanBtn').disabled = true;
+
+  // reset UI
+  setStep('crawl','active'); setStep('sqlmap','idle'); setStep('pdf','idle'); setStep('done','idle');
+  setOverallProgress(4); setStageMsg('เริ่มสแกน URL (crawler)');
+  $('urlList').innerHTML=''; $('activityLog').textContent=''; $('downloadPdfBtn').classList.add('d-none');
+  $('cancelBtn').classList.remove('d-none');
+
+  let cleaned_urls = [];
+  try {
+    log('Calling /api/crawler/scan ...');
+    const res = await fetch('/api/crawler/scan', { method:'POST', headers: auth, body: JSON.stringify({ url: startUrl }) });
+    if(res.status===401){ alert('Auth error — login again'); window.location.href='/login'; return; }
+    const data = await res.json();
+    if(!data.ok){ log('Crawler failed: ' + (data.error||data.msg||JSON.stringify(data))); setStageMsg('Crawl failed'); setOverallProgress(0); $('scanBtn').disabled=false; return; }
+    cleaned_urls = data.cleaned_urls||[];
+    log(`Crawler returned ${cleaned_urls.length} cleaned URLs (raw ${data.count_raw||0}).`);
+  } catch(err){ log('Crawler exception: '+err); setStageMsg('Crawl failed (exception)'); setOverallProgress(0); $('scanBtn').disabled=false; return; }
+
+  const urlListEl = $('urlList');
+  const items = [];
+  cleaned_urls.forEach((u,i)=>{
+    const div = document.createElement('div');
+    div.className='url-item'; div.dataset.index=i;
+    div.innerHTML = `<div style="flex:1;"><div style="font-size:0.9rem;word-break:break-all">${u}</div><div class="small-muted">#${i+1}</div></div><div><div id="status-${i}" class="url-status status-pending">PENDING</div></div>`;
+    urlListEl.appendChild(div);
+    items.push({ url:u, index:i, node:div });
+  });
+
+  setStep('crawl','done'); setStep('sqlmap','active'); setStageMsg('รัน SQLMap ทีละ URL');
+
+  let completed = 0, total = items.length;
+  setOverallProgress((completed/Math.max(1,total))*60 + 10);
+
+  const queue = items.slice();
+  const resultsCollector = [];
+
+  const worker = async () => {
+    while(queue.length && !abortRequested){
+      const it = queue.shift();
+      const idx = it.index, url=it.url;
+      const statusEl = $('status-'+idx);
+      try{
+        statusEl.className='url-status status-running'; statusEl.textContent='RUNNING';
+        log(`Starting sqlmap for #${idx+1} ${url}`);
+        const payload={ cleaned_urls:[url], maxConcurrency:1, createPdf:false }; // <--- never create per-URL PDF
+        const resp = await fetch('/api/run-sqlmap-urls',{ method:'POST', headers:auth, body:JSON.stringify(payload) });
+        if(resp.status===401){ alert('Auth error — login again'); window.location.href='/login'; return; }
+        const data = await resp.json();
+        if(data && data.results && data.results.length){
+          const r=data.results[0];
+          if(r.ok){ statusEl.className='url-status status-ok'; statusEl.textContent='OK'; log(`#${idx+1} OK — DBs: ${r.listDb?.count||0}`); }
+          else { statusEl.className='url-status status-fail'; statusEl.textContent='FAILED'; log(`#${idx+1} FAILED — ${r.error||'no details'}`); }
+          resultsCollector.push(r);
+        } else { statusEl.className='url-status status-fail'; statusEl.textContent='NO-RESULT'; log(`#${idx+1} — no results returned`); }
+      } catch(err){ statusEl.className='url-status status-fail'; statusEl.textContent='ERROR'; log(`#${idx+1} exception: ${err}`); }
+      finally { completed++; setOverallProgress(10 + (completed/Math.max(1,total))*60); }
+    }
+  };
+
+  const workers=[];
+  for(let i=0;i<Math.min(2,items.length);i++) workers.push(worker());
+  await Promise.all(workers);
+
+  if(abortRequested){ setStageMsg('Canceled'); log('Scan canceled by user.'); setStep('sqlmap','done'); setOverallProgress(Math.min(100,10 + (completed/Math.max(1,total))*60)); $('cancelBtn').classList.add('d-none'); $('scanBtn').disabled=false; return; }
+
+  setStep('sqlmap','done'); setStageMsg('SQLMap phase finished');
+
+  // ---------- generate combined PDF after scan ----------
+  setStep('pdf','active'); setStageMsg('Generating PDF...');
+  log('Requesting server to generate combined PDF');
+
+  try{
+    const finalResp = await fetch('/api/run-sqlmap-urls',{ method:'POST', headers:auth, body:JSON.stringify({ cleaned_urls: cleaned_urls, maxConcurrency:2, createPdf:true }) });
+    if(finalResp.status===401){ alert('Auth error — login again'); window.location.href='/login'; return; }
+    const finalData = await finalResp.json();
+    if(finalData.reportPdf){
+      $('downloadPdfBtn').href=finalData.reportPdf; $('downloadPdfBtn').classList.remove('d-none'); $('downloadPdfBtn').textContent='ดาวน์โหลด PDF รวมทั้งหมด';
+      log('Combined PDF ready: '+finalData.reportPdf);
+    } else { log('Server did not return combined PDF.'); }
+  } catch(err){ log('Error requesting combined PDF: '+err); }
+
+  setOverallProgress(95); setStep('pdf','done');
+  setStep('done','active'); setStageMsg('All done'); setOverallProgress(100); setStep('done','done');
+  log('Scan finished.');
+  $('cancelBtn').classList.add('d-none'); $('scanBtn').disabled=false;
+});
+</script>
+</body>
+</html>
