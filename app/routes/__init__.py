@@ -6,6 +6,7 @@ def register_routes(app):
     from .user import bp as user_bp  # ต้องมีไฟล์ app/routes/user.py
     from .crawler import bp as crawler_bp
     from .sqlmap_urls import bp as sqlmap_urls_bp
+ 
 
     app.register_blueprint(auth_bp)
     app.register_blueprint(sqlmap_bp)
@@ -13,4 +14,5 @@ def register_routes(app):
     app.register_blueprint(user_bp)
     app.register_blueprint(crawler_bp)
     app.register_blueprint(sqlmap_urls_bp)
+
 

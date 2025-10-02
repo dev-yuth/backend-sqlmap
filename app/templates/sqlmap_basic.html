@@ -1,0 +1,561 @@
+<!-- app/templates/sqlmap_basic.html -->
+<!doctype html>
+<html lang="th">
+
+<head>
+    <meta charset="utf-8" />
+    <title>SQLMap Basic Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        .steps {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 12rem;
+            text-align: center;
+        }
+
+        .step-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            background: #d1d5db;
+            transition: background .25s ease, transform .15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .step-label {
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+            color: #374151;
+        }
+
+        .step.active .step-circle {
+            background: linear-gradient(90deg, #0ea5a4, #06b6d4);
+            transform: translateY(-4px);
+        }
+
+        .step.done .step-circle {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+
+        .progress-wrap {
+            width: 100%;
+            background: #e6edf0;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 18px;
+            margin-bottom: 0.75rem;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            transition: width .35s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .url-list {
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid #e6edf0;
+            padding: 0.5rem;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .url-item {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.35rem 0.25rem;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+
+        .url-item:last-child {
+            border-bottom: none;
+        }
+
+        .url-status {
+            min-width: 95px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: #fff;
+        }
+
+        .status-pending {
+            background: #9ca3af;
+        }
+
+        .status-running {
+            background: #06b6d4;
+        }
+
+        .status-ok {
+            background: #10b981;
+        }
+
+        .status-fail {
+            background: #ef4444;
+        }
+
+        .small-muted {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .item-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        /* icons / actions (from sqlmap_ulrs) */
+        .url-actions {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+            margin-left: 8px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            line-height: 0;
+            color: #374151;
+        }
+
+        .icon-btn:hover { color: #000; }
+
+        .url-detail hr { margin: 0.5rem 0; border-color: #e6edf0; }
+    </style>
+</head>
+
+<body class="bg-light">
+    <div class="container py-4">
+        <h4 class="mb-3">SQLMap Basic Scanner</h4>
+
+        <div class="card mb-3">
+            <div class="card-body">
+                <div class="d-flex gap-2 mb-3">
+                    <button id="addItem" class="btn btn-secondary btn-sm">Add Item</button>
+                    <button id="startScan" class="btn btn-primary">Start Scan</button>
+                    <a id="downloadPdf" class="btn btn-success btn-sm ms-auto d-none" target="_blank">ดาวน์โหลด PDF</a>
+                </div>
+
+                <div id="itemsContainer"></div>
+            </div>
+        </div>
+
+        <div class="steps mb-3">
+            <div class="step" id="step-1">
+                <div class="step-circle">1</div>
+                <div class="step-label">Config</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-circle">2</div>
+                <div class="step-label">Scan</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-circle">3</div>
+                <div class="step-label">PDF</div>
+            </div>
+            <div class="step" id="step-4">
+                <div class="step-circle">4</div>
+                <div class="step-label">Done</div>
+            </div>
+        </div>
+
+        <div class="progress-wrap mb-3">
+            <div id="progressBar" class="progress-fill">0%</div>
+        </div>
+
+        <div class="small-muted mb-2" id="stageText">Ready</div>
+
+        <div class="url-list" id="urlList"></div>
+    </div>
+
+    <template id="itemTemplate">
+        <div class="item-card" data-item>
+            <div class="mb-2">
+                <label class="form-label small">URL</label>
+                <input data-url class="form-control form-control-sm" placeholder="http://example.com" />
+            </div>
+            <div class="mb-2">
+                <label class="form-label small">Data (JSON)</label>
+                <textarea data-data class="form-control form-control-sm" rows="2"
+                    placeholder='{"param":"value"}'></textarea>
+            </div>
+            <button class="btn btn-danger btn-sm" data-remove>Remove</button>
+        </div>
+    </template>
+
+    <!-- Viewer Modal (Raw JSON / Sheet) -->
+    <div class="modal fade" id="viewerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="viewerTitle" class="modal-title">Result</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="viewerTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw" type="button" role="tab">Raw JSON</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet" type="button" role="tab">Sheet / Parsed</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="tab-raw" role="tabpanel">
+                            <pre id="rawJson" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+                        </div>
+
+                        <div class="tab-pane fade" id="tab-sheet" role="tabpanel">
+                            <div id="sheetContent">
+                                <!-- dynamic content: parametersRaw and listDb -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="copyJsonBtn" class="btn btn-sm btn-outline-secondary">Copy JSON</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        const $ = id => document.getElementById(id);
+        const setStep = (num, state) => { const el = $('step-' + num); if(!el) return; el.classList.remove('active','done'); if (state === 'active') el.classList.add('active'); if (state === 'done') el.classList.add('done'); };
+        const setProgress = p => { const el = $('progressBar'); el.style.width = p + '%'; el.textContent = p + '%'; };
+        const logStage = msg => $('stageText').textContent = msg;
+
+        const MAX_ITEMS = 2;
+        const ENDPOINT = 'http://localhost:5000/api/run-sqlmap';
+
+        function countItems() {
+            return $('itemsContainer').querySelectorAll('[data-item]').length;
+        }
+
+        function updateAddBtn() {
+            $('addItem').disabled = countItems() >= MAX_ITEMS;
+        }
+
+        $('addItem').addEventListener('click', () => {
+            if (countItems() >= MAX_ITEMS) {
+                alert('Maximum ' + MAX_ITEMS + ' items');
+                return;
+            }
+            const tpl = document.getElementById('itemTemplate');
+            const clone = tpl.content.cloneNode(true);
+            const card = clone.querySelector('[data-item]');
+
+            clone.querySelector('[data-remove]').addEventListener('click', () => {
+                card.remove();
+                updateAddBtn();
+            });
+
+            $('itemsContainer').appendChild(clone);
+            updateAddBtn();
+        });
+
+        function buildPayload() {
+            const items = Array.from($('itemsContainer').querySelectorAll('[data-item]'));
+            return items.map(item => {
+                const url = item.querySelector('[data-url]').value.trim();
+                const dataStr = item.querySelector('[data-data]').value.trim();
+
+                if (!url) throw new Error('URL required');
+
+                const obj = { url };
+                if (dataStr) {
+                    try {
+                        obj.data = JSON.parse(dataStr);
+                    } catch (e) {
+                        throw new Error('Invalid JSON in data field');
+                    }
+                }
+                return obj;
+            });
+        }
+
+        // collector for results so modal can access them
+        const resultsCollector = [];
+
+        // attach JSON / Sheet icons to url-item (node is the url-item element)
+        function attachResultIcons(node, idx) {
+            let actions = node.querySelector('.url-actions');
+            if (!actions) {
+                actions = document.createElement('div');
+                actions.className = 'url-actions';
+                node.appendChild(actions);
+            }
+
+            // JSON icon
+            const jsonBtn = document.createElement('button');
+            jsonBtn.className = 'icon-btn';
+            jsonBtn.title = 'ดู raw JSON';
+            jsonBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 1.5A.5.5 0 0 1 9 2v12a.5.5 0 0 1-1 0V2a.5.5 0 0 1 .5-.5z"/><path d="M2 2.5A1.5 1.5 0 0 1 3.5 1h1A1.5 1.5 0 0 1 6 2.5v11A1.5 1.5 0 0 1 4.5 15h-1A1.5 1.5 0 0 1 2 13.5v-11zM10 2.5A1.5 1.5 0 0 1 11.5 1h1A1.5 1.5 0 0 1 14 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-1A1.5 1.5 0 0 1 10 13.5v-11z"/></svg>`;
+            jsonBtn.addEventListener('click', () => showViewerModal(idx, 'raw'));
+            actions.appendChild(jsonBtn);
+
+            // Sheet icon
+            const sheetBtn = document.createElement('button');
+            sheetBtn.className = 'icon-btn';
+            sheetBtn.title = 'ดูชีตข้อมูล (parametersRaw, listDb)';
+            sheetBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zM3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3z"/><path d="M5 4h6v1H5V4zm0 2h6v1H5V6zm0 2h6v1H5V8z"/></svg>`;
+            sheetBtn.addEventListener('click', () => showViewerModal(idx, 'sheet'));
+            actions.appendChild(sheetBtn);
+        }
+
+        // show viewer modal for index (uses resultsCollector entries of shape { index, result })
+        function showViewerModal(idx, tab = 'raw') {
+            const foundObj = resultsCollector.find(x => x.index === idx);
+            const modalEl = document.getElementById('viewerModal');
+            const viewer = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const title = $('viewerTitle');
+            const rawJson = $('rawJson');
+            const sheetContent = $('sheetContent');
+
+            if (!foundObj) {
+                title.textContent = `No result for #${idx + 1}`;
+                rawJson.textContent = 'No data available';
+                sheetContent.innerHTML = '<div class="small-muted">ไม่มีข้อมูล parsed</div>';
+            } else {
+                title.textContent = `Result for #${idx + 1}`;
+                try {
+                    rawJson.textContent = JSON.stringify(foundObj.result, null, 2);
+                } catch (e) {
+                    rawJson.textContent = String(foundObj.result);
+                }
+
+                const r = foundObj.result;
+                let html = '';
+
+                // listDb
+                if (r.listDb) {
+                    html += `<h6>Databases (${r.listDb.count ?? (r.listDb.names ? r.listDb.names.length : 0)})</h6>`;
+                    if (Array.isArray(r.listDb.names) && r.listDb.names.length) {
+                        html += `<div style="max-height:220px; overflow:auto;"><table class="table table-sm table-bordered"><thead><tr><th>#</th><th>Database</th></tr></thead><tbody>`;
+                        r.listDb.names.forEach((dbName, i) => {
+                            html += `<tr><td>${i + 1}</td><td style="word-break:break-all">${escapeHtml(String(dbName))}</td></tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    } else {
+                        html += `<div class="small-muted">ไม่มีชื่อฐานข้อมูล</div>`;
+                    }
+                } else {
+                    html += `<div class="small-muted">ไม่มีข้อมูล listDb</div>`;
+                }
+
+                // parametersRaw
+                if (Array.isArray(r.parametersRaw) && r.parametersRaw.length) {
+                    html += `<hr><h6>Parameters</h6>`;
+                    r.parametersRaw.forEach((p, pi) => {
+                        html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? ('index ' + (p.index ?? pi)))}</div>`;
+                        if (p.raw) {
+                            html += `<pre style="background:#f8f9fa;padding:8px;border-radius:6px;max-height:220px;overflow:auto;">${escapeHtml(p.raw)}</pre>`;
+                        } else if (p.findings) {
+                            html += `<div>`;
+                            p.findings.forEach(f => {
+                                html += `<div class="mb-1"><div class="fw-semibold small-muted">${escapeHtml(f.type || '')} — ${escapeHtml(f.title || '')}</div><div style="word-break:break-all">${escapeHtml(f.payload || '')}</div></div>`;
+                            });
+                            html += `</div>`;
+                        } else {
+                            html += `<div class="small-muted">ไม่มีรายละเอียด</div>`;
+                        }
+                        html += `</div>`;
+                    });
+                } else {
+                    html += `<hr><div class="small-muted">ไม่มี parametersRaw</div>`;
+                }
+
+                sheetContent.innerHTML = html;
+            }
+
+            // switch tab
+            const rawTabBtn = document.querySelector('#raw-tab');
+            const sheetTabBtn = document.querySelector('#sheet-tab');
+            if (tab === 'sheet') {
+                const tabTrigger = new bootstrap.Tab(sheetTabBtn);
+                tabTrigger.show();
+            } else {
+                const tabTrigger = new bootstrap.Tab(rawTabBtn);
+                tabTrigger.show();
+            }
+
+            viewer.show();
+
+            // copy json
+            $('copyJsonBtn').onclick = () => {
+                try {
+                    navigator.clipboard.writeText(rawJson.textContent);
+                    alert('Raw JSON copied to clipboard');
+                } catch (e) {
+                    alert('Copy failed: ' + e);
+                }
+            };
+        }
+
+        // escape helper
+        function escapeHtml(s) {
+            if (!s && s !== 0) return '';
+            return String(s).replace(/[&<>"'`=\/]/g, function (c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c];
+            });
+        }
+
+        // main scan
+        $('startScan').addEventListener('click', async () => {
+            try {
+                const payload = buildPayload();
+                if (!payload.length) {
+                    alert('Please add at least one item');
+                    return;
+                }
+
+                // Reset UI
+                $('urlList').innerHTML = '';
+                $('downloadPdf').classList.add('d-none');
+                setStep(1, 'done'); setStep(2, 'active'); setStep(3, 'idle'); setStep(4, 'idle');
+                logStage('Starting scan...');
+                setProgress(10);
+
+                // clear collector
+                resultsCollector.length = 0;
+
+                // Show items in list
+                payload.forEach((p, i) => {
+                    const div = document.createElement('div');
+                    div.className = 'url-item';
+                    div.dataset.index = i;
+                    // layout: left=URL, middle=status, right(actions)
+                    div.innerHTML = `<div style="flex:1"><div style="font-size:0.95rem;word-break:break-all">${escapeHtml(p.url)}</div></div><div><div id="status-${i}" class="url-status status-pending">PENDING</div></div>`;
+                    $('urlList').appendChild(div);
+                });
+
+                setProgress(20);
+                logStage('Running SQLMap...');
+
+                // Call API (batch)
+                const res = await fetch(ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+
+                setProgress(60);
+                setStep(2, 'done');
+                setStep(3, 'active');
+                logStage('Processing results...');
+
+                // Update status + attach icons + resultsCollector
+                if (data.results && Array.isArray(data.results)) {
+                    data.results.forEach((r, i) => {
+                        const statusEl = $('status-' + i);
+                        const parentDiv = statusEl ? statusEl.parentElement : null;
+                        const ok = !!r.ok;
+                        if (statusEl) {
+                            statusEl.className = 'url-status ' + (ok ? 'status-ok' : 'status-fail');
+                            statusEl.textContent = ok ? 'OK' : 'FAIL';
+                        }
+
+                        // push to collector (store { index, result })
+                        resultsCollector.push({ index: i, result: r });
+
+                        // attach icons to the url-item node
+                        const node = document.querySelector(`.url-item[data-index="${i}"]`);
+                        if (node) attachResultIcons(node, i);
+
+                        // also add inline short detail under status (listDb summary + first parameter)
+                        if (parentDiv) {
+                            let shortHtml = '';
+                            if (r.listDb && Array.isArray(r.listDb.names) && r.listDb.names.length) {
+                                const names = r.listDb.names.slice(0, 6).map(n => escapeHtml(n)).join(', ');
+                                shortHtml += `<div class="small-muted" style="margin-top:6px">DBs: ${r.listDb.count ?? r.listDb.names.length} — ${names}${r.listDb.names.length>6? ' ...':''}</div>`;
+                            } else {
+                                shortHtml += `<div class="small-muted" style="margin-top:6px">DBs: 0</div>`;
+                            }
+                            // parameter quick hint
+                            if (Array.isArray(r.parametersRaw) && r.parametersRaw.length) {
+                                const p0 = r.parametersRaw[0];
+                                shortHtml += `<div class="small-muted" style="margin-top:3px">Param: ${escapeHtml(p0.parameter || (p0.index ?? ''))}</div>`;
+                            }
+                            // let detailDiv = parentDiv.querySelector('.url-detail');
+                            // if (!detailDiv) {
+                            //     detailDiv = document.createElement('div');
+                            //     detailDiv.className = 'url-detail mt-2';
+                            //     parentDiv.appendChild(detailDiv);
+                            // }
+                            // detailDiv.innerHTML = shortHtml;
+                        }
+                    });
+                }
+
+                setProgress(90);
+                setStep(3, 'done');
+
+                // Check for PDF
+                if (data.reportPdf) {
+                    $('downloadPdf').href = data.reportPdf;
+                    $('downloadPdf').classList.remove('d-none');
+                    logStage('PDF ready!');
+                } else {
+                    logStage('Scan complete (no PDF)');
+                }
+
+                setStep(4, 'active');
+                setProgress(100);
+                setTimeout(() => setStep(4, 'done'), 300);
+
+            } catch (e) {
+                alert('Error: ' + (e && e.message ? e.message : e));
+                logStage('Error: ' + (e && e.message ? e.message : e));
+                setProgress(0);
+            }
+        });
+
+        // Initialize
+        setStep(1, 'active');
+    </script>
+</body>
+
+</html>

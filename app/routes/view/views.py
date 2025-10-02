@@ -31,3 +31,7 @@ def user_dashboard():
 @bp.route("/sqlmap_urls")
 def sqlmap_urls():
     return render_template("sqlmap_ulrs.html")
+    
+@bp.route("/sqlmap_basic")
+def sqlmap_basic():
+    return render_template("sqlmap_basic.html")
