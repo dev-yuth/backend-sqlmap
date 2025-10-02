@@ -128,6 +128,23 @@
             color: #6b7280;
         }
 
+        .url-actions {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            line-height: 0;
+            color: #374151;
+        }
+
+        .icon-btn:hover { color: #000; }
+
         @media (max-width:640px) {
             .step {
                 width: 48%;
@@ -210,6 +227,49 @@
         </div>
     </div>
 
+    <!-- Modal: dynamic viewer -->
+    <div class="modal fade" id="viewerModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 id="viewerTitle" class="modal-title">Result</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <!-- Tabs -->
+                    <ul class="nav nav-tabs mb-3" id="viewerTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw" type="button" role="tab">Raw JSON</button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet" type="button" role="tab">Sheet / Parsed</button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content">
+                        <div class="tab-pane fade show active" id="tab-raw" role="tabpanel">
+                            <pre id="rawJson" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+                        </div>
+
+                        <div class="tab-pane fade" id="tab-sheet" role="tabpanel">
+                            <div id="sheetContent">
+                                <!-- dynamic content: parametersRaw and listDb -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-footer">
+                    <button id="copyJsonBtn" class="btn btn-sm btn-outline-secondary">Copy JSON</button>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
     <script>
         const $ = id => document.getElementById(id);
         const log = (txt) => { const el = $('activityLog'); el.textContent = (new Date()).toLocaleTimeString() + "  " + txt + "\n" + el.textContent; };
@@ -222,6 +282,135 @@
         $('logoutBtn').addEventListener('click', () => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); window.location.href = '/login'; });
         $('cancelBtn').addEventListener('click', () => { abortRequested = true; $('cancelBtn').classList.add('d-none'); log('Cancel requested — stopping after current jobs finish.'); });
 
+        // store results per index so modal can fetch them
+        const resultsCollector = [];
+
+        // helper to attach icons to url-item (index is integer)
+        function attachResultIcons(node, idx) {
+            // create wrapper for actions
+            let actions = node.querySelector('.url-actions');
+            if (!actions) {
+                actions = document.createElement('div');
+                actions.className = 'url-actions';
+                node.appendChild(actions);
+            }
+
+            // JSON icon button
+            const jsonBtn = document.createElement('button');
+            jsonBtn.className = 'icon-btn';
+            jsonBtn.title = 'ดู raw JSON';
+            jsonBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 1.5A.5.5 0 0 1 9 2v12a.5.5 0 0 1-1 0V2a.5.5 0 0 1 .5-.5z"/><path d="M2 2.5A1.5 1.5 0 0 1 3.5 1h1A1.5 1.5 0 0 1 6 2.5v11A1.5 1.5 0 0 1 4.5 15h-1A1.5 1.5 0 0 1 2 13.5v-11zM10 2.5A1.5 1.5 0 0 1 11.5 1h1A1.5 1.5 0 0 1 14 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-1A1.5 1.5 0 0 1 10 13.5v-11z"/></svg>`;
+            jsonBtn.addEventListener('click', () => showViewerModal(idx, 'raw'));
+            actions.appendChild(jsonBtn);
+
+            // Sheet icon button
+            const sheetBtn = document.createElement('button');
+            sheetBtn.className = 'icon-btn';
+            sheetBtn.title = 'ดูชีตข้อมูล (parametersRaw, listDb)';
+            sheetBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zM3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3z"/><path d="M5 4h6v1H5V4zm0 2h6v1H5V6zm0 2h6v1H5V8z"/></svg>`;
+            sheetBtn.addEventListener('click', () => showViewerModal(idx, 'sheet'));
+            actions.appendChild(sheetBtn);
+        }
+
+        // show viewer modal for result at index
+        function showViewerModal(idx, tab = 'raw') {
+            const found = resultsCollector.find(x => x.index === idx);
+            const modalEl = document.getElementById('viewerModal');
+            const viewer = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const title = $('viewerTitle');
+            const rawJson = $('rawJson');
+            const sheetContent = $('sheetContent');
+
+            if (!found) {
+                title.textContent = `No result for #${idx + 1}`;
+                rawJson.textContent = 'No data available';
+                sheetContent.innerHTML = '<div class="small-muted">ไม่มีข้อมูล parsed</div>';
+            } else {
+                title.textContent = `Result for #${idx + 1}`;
+                try {
+                    rawJson.textContent = JSON.stringify(found.result, null, 2);
+                } catch (e) {
+                    rawJson.textContent = String(found.result);
+                }
+
+                // build sheet content: parametersRaw (formatted) and listDb (table)
+                const r = found.result;
+                let html = '';
+
+                // listDb
+                if (r.listDb) {
+                    html += `<h6>Databases (${r.listDb.count ?? (r.listDb.names ? r.listDb.names.length : 0)})</h6>`;
+                    if (Array.isArray(r.listDb.names) && r.listDb.names.length) {
+                        html += `<div style="max-height:220px; overflow:auto;"><table class="table table-sm table-bordered"><thead><tr><th>#</th><th>Database</th></tr></thead><tbody>`;
+                        r.listDb.names.forEach((dbName, i) => {
+                            html += `<tr><td>${i + 1}</td><td style="word-break:break-all">${escapeHtml(String(dbName))}</td></tr>`;
+                        });
+                        html += `</tbody></table></div>`;
+                    } else {
+                        html += `<div class="small-muted">ไม่มีชื่อฐานข้อมูล</div>`;
+                    }
+                } else {
+                    html += `<div class="small-muted">ไม่มีข้อมูล listDb</div>`;
+                }
+
+                // parametersRaw
+                if (Array.isArray(r.parametersRaw) && r.parametersRaw.length) {
+                    html += `<hr><h6>Parameters</h6>`;
+                    r.parametersRaw.forEach((p, pi) => {
+                        html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? ('index ' + (p.index ?? pi)))}</div>`;
+                        if (p.raw) {
+                            html += `<pre style="background:#f8f9fa;padding:8px;border-radius:6px;max-height:220px;overflow:auto;">${escapeHtml(p.raw)}</pre>`;
+                        } else if (p.findings) {
+                            html += `<div>`;
+                            p.findings.forEach(f => {
+                                html += `<div class="mb-1"><div class="fw-semibold small-muted">${escapeHtml(f.type || '')} — ${escapeHtml(f.title || '')}</div><div style="word-break:break-all">${escapeHtml(f.payload || '')}</div></div>`;
+                            });
+                            html += `</div>`;
+                        } else {
+                            html += `<div class="small-muted">ไม่มีรายละเอียด</div>`;
+                        }
+                        html += `</div>`;
+                    });
+                } else {
+                    html += `<hr><div class="small-muted">ไม่มี parametersRaw</div>`;
+                }
+
+                sheetContent.innerHTML = html;
+            }
+
+            // switch to requested tab
+            const rawTabBtn = document.querySelector('#raw-tab');
+            const sheetTabBtn = document.querySelector('#sheet-tab');
+            if (tab === 'sheet') {
+                const tabTrigger = new bootstrap.Tab(sheetTabBtn);
+                tabTrigger.show();
+            } else {
+                const tabTrigger = new bootstrap.Tab(rawTabBtn);
+                tabTrigger.show();
+            }
+
+            // show modal
+            viewer.show();
+
+            // copy json
+            $('copyJsonBtn').onclick = () => {
+                try {
+                    navigator.clipboard.writeText(rawJson.textContent);
+                    alert('Raw JSON copied to clipboard');
+                } catch (e) {
+                    alert('Copy failed: ' + e);
+                }
+            };
+        }
+
+        // escape helper to avoid HTML injection
+        function escapeHtml(s) {
+            return s.replace(/[&<>"'`=\/]/g, function (c) {
+                return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;','/':'&#x2F;','`':'&#x60;','=':'&#x3D;'}[c];
+            });
+        }
+
+        // main scan click handler (updated to push {index, result} into resultsCollector)
         $('scanBtn').addEventListener('click', async () => {
             abortRequested = false;
             const startUrl = $('startUrl').value.trim();
@@ -238,6 +427,8 @@
             setOverallProgress(4); setStageMsg('เริ่มสแกน URL (crawler)');
             $('urlList').innerHTML = ''; $('activityLog').textContent = ''; $('downloadPdfBtn').classList.add('d-none');
             $('cancelBtn').classList.remove('d-none');
+
+            resultsCollector.length = 0; // clear previous
 
             let cleaned_urls = [];
             try {
@@ -266,7 +457,6 @@
             setOverallProgress((completed / Math.max(1, total)) * 60 + 10);
 
             const queue = items.slice();
-            const resultsCollector = [];
 
             const worker = async () => {
                 while (queue.length && !abortRequested) {
@@ -282,12 +472,35 @@
                         const data = await resp.json();
                         if (data && data.results && data.results.length) {
                             const r = data.results[0];
-                            if (r.ok) { statusEl.className = 'url-status status-ok'; statusEl.textContent = 'OK'; log(`#${idx + 1} OK — DBs: ${r.listDb?.count || 0}`); }
-                            else { statusEl.className = 'url-status status-fail'; statusEl.textContent = 'FAILED'; log(`#${idx + 1} FAILED — ${r.error || 'no details'}`); }
-                            resultsCollector.push(r);
-                        } else { statusEl.className = 'url-status status-fail'; statusEl.textContent = 'NO-RESULT'; log(`#${idx + 1} — no results returned`); }
-                    } catch (err) { statusEl.className = 'url-status status-fail'; statusEl.textContent = 'ERROR'; log(`#${idx + 1} exception: ${err}`); }
-                    finally { completed++; setOverallProgress(10 + (completed / Math.max(1, total)) * 60); }
+                            // store result with index for later viewing
+                            resultsCollector.push({ index: idx, result: r });
+
+                            if (r.ok) {
+                                statusEl.className = 'url-status status-ok';
+                                statusEl.textContent = 'OK';
+                                log(`#${idx + 1} OK — DBs: ${r.listDb?.count || (r.listDb?.names?.length ?? 0)}`);
+                                // attach icons (json / sheet)
+                                attachResultIcons(it.node, idx);
+                            } else {
+                                statusEl.className = 'url-status status-fail';
+                                statusEl.textContent = 'FAILED';
+                                log(`#${idx + 1} FAILED — ${r.error || 'no details'}`);
+                                // still attach icons so user can inspect
+                                attachResultIcons(it.node, idx);
+                            }
+                        } else {
+                            statusEl.className = 'url-status status-fail';
+                            statusEl.textContent = 'NO-RESULT';
+                            log(`#${idx + 1} — no results returned`);
+                        }
+                    } catch (err) {
+                        statusEl.className = 'url-status status-fail';
+                        statusEl.textContent = 'ERROR';
+                        log(`#${idx + 1} exception: ${err}`);
+                    } finally {
+                        completed++;
+                        setOverallProgress(10 + (completed / Math.max(1, total)) * 60);
+                    }
                 }
             };
 
