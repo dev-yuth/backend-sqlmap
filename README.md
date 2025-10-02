@@ -76,3 +76,9 @@ py -3 -m flask --app manage.py db upgrade
 3. ติดตั้ง dependencies ผ่าน `py -3 -m pip install -r requirements.txt`  
 4. ตั้งค่า `$env:FLASK_APP="manage.py"`  
 5. ใช้ `flask db migrate` และ `flask db upgrade` เพื่อ sync database  
+
+
+
+pip freeze > requirements.txt
+
+pip install -r requirements.txt
