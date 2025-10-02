@@ -21,6 +21,7 @@ from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from reportlab.lib.units import cm
 
+
 from flask_jwt_extended import jwt_required
 
 bp = Blueprint("sqlmap_urls", __name__)

@@ -7,14 +7,28 @@ from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import subprocess
+import datetime
 
 from flask import Blueprint, request, current_app
 
 from app.config import get_python_path, get_sqlmap_path
 
+# --- PDF (reportlab) ---
+from reportlab.lib.pagesizes import A4
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet
+from reportlab.lib import colors
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.units import cm
+
+from flask_jwt_extended import jwt_required
+from flask import Blueprint, request, current_app, send_from_directory, url_for, abort
+
+
 bp = Blueprint("sqlmap_api", __name__)
 
-# regex / helpers (same as original)
+# --- regex / helpers (same as original) ---
 BLOCK_RE = re.compile(r"---\n(Parameter:.*?)\n---", flags=re.DOTALL | re.IGNORECASE)
 PARAM_LINE_RE = re.compile(r"Parameter:\s*(?P<name>[\w\-\._]+)\s*(?:\((?P<loc>[^)]+)\))?", flags=re.IGNORECASE)
 RESUMED_RE = re.compile(r"resumed:\s*'?(?P<val>[^']+)'?", flags=re.IGNORECASE)
@@ -121,11 +135,105 @@ ALLOWED_FLAGS = {
 }
 EXTRA_ARG_SAFE_RE = re.compile(r"^[-]{1,2}[A-Za-z0-9\-\._/]+=?.*$")
 
+# --- PDF utilities (copied/adapted from sqlmap_urls.py) ---
+THAI_FONT_NAME = "THSarabunNew"
+try:
+    pdfmetrics.registerFont(TTFont(THAI_FONT_NAME, "THSarabunNew.ttf"))
+except Exception as e:
+    # don't raise — just warn (Flask logs will show it)
+    print(f"Warning: Thai font registration failed: {e}")
+
+def thai_datetime_str():
+    months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
+              'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
+    d = datetime.datetime.now()
+    return f"{d.day:02d} {months[d.month-1]} {d.year+543} เวลา {d.hour:02d}:{d.minute:02d} น."
+
+def generate_pdf_report(results: List[Dict[str, Any]]) -> str:
+    """
+    Generate a PDF report from results list.
+    Returns absolute path to generated PDF file.
+    """
+    output_dir = os.path.join(os.getcwd(), "app", "files")
+    os.makedirs(output_dir, exist_ok=True)
+    pdf_path = os.path.join(output_dir, f"sqlmap_report_{int(datetime.datetime.now().timestamp())}.pdf")
+
+    doc = SimpleDocTemplate(pdf_path, pagesize=A4,
+                            rightMargin=2*cm, leftMargin=2*cm,
+                            topMargin=2*cm, bottomMargin=2*cm)
+
+    styles = getSampleStyleSheet()
+    # Override default fonts if THAI font loaded
+    for key in styles.byName:
+        try:
+            styles[key].fontName = THAI_FONT_NAME
+        except Exception:
+            pass
+
+    story = []
+
+    # Header
+    story.append(Paragraph("รายงานผลการสแกน SQLMap", styles["Title"]))
+    story.append(Paragraph(f"จัดทำเมื่อ: {thai_datetime_str()}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+
+    # Summary
+    total_items = len(results)
+    total_db_names = sum(len(r.get("listDb", {}).get("names", [])) for r in results)
+    story.append(Paragraph(f"สรุปผล: จำนวนรายการ {total_items} | จำนวนฐานข้อมูลรวม {total_db_names}", styles["Normal"]))
+    story.append(Spacer(1, 12))
+
+    # Details per URL
+    for idx, r in enumerate(results, 1):
+        story.append(Paragraph(f"รายการที่ {idx}: {r.get('url','')}", styles["Heading2"]))
+        story.append(Paragraph(f"สถานะ: {'OK' if r.get('ok') else 'FAILED'}", styles["Normal"]))
+        story.append(Spacer(1, 6))
+
+        # Databases
+        list_db = r.get("listDb", {})
+        db_names = list_db.get("names", [])
+        db_count = list_db.get("count", 0)
+
+        story.append(Paragraph(f"ฐานข้อมูลที่พบ ({db_count}):", styles["Heading3"]))
+        if db_names:
+            data = [["#", "Database Name"]] + [[str(i+1), name] for i, name in enumerate(db_names)]
+            table = Table(data, colWidths=[1.2*cm, 14*cm])
+            table.setStyle(TableStyle([
+                ("GRID", (0,0), (-1,-1), 0.5, colors.black),
+                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
+                ("FONTNAME", (0,0), (-1,-1), THAI_FONT_NAME),
+                ("FONTSIZE", (0,0), (-1,-1), 10),
+            ]))
+            story.append(table)
+        else:
+            story.append(Paragraph("ไม่พบฐานข้อมูล", styles["Normal"]))
+        story.append(Spacer(1, 6))
+
+        # Parameters
+        params = r.get("parametersRaw", [])
+        story.append(Paragraph("รายละเอียดพารามิเตอร์:", styles["Heading3"]))
+        if params:
+            for p in params:
+                story.append(Paragraph(f"Parameter: {p.get('parameter')} (Location: {p.get('location')})", styles["Normal"]))
+                for f in p.get("findings", []):
+                    story.append(Paragraph(f"- Type: {f.get('type','')}", styles["Normal"]))
+                    story.append(Paragraph(f"  Title: {f.get('title','')}", styles["Normal"]))
+                    story.append(Paragraph(f"  Payload: {f.get('payload','')}", styles["Normal"]))
+                story.append(Spacer(1, 6))
+        else:
+            story.append(Paragraph("ไม่พบพารามิเตอร์ที่มีช่องโหว่", styles["Normal"]))
+
+        story.append(PageBreak())
+
+    doc.build(story)
+    return pdf_path
+
 @bp.route("/health", methods=["GET"])
 def health():
     return {"ok": True, "service": "sqlmap-api", "version": 1}, 200
 
 @bp.route("/api/run-sqlmap", methods=["POST"])
+@jwt_required()
 def run_sqlmap():
     try:
         body = request.get_json(force=True, silent=False) or {}
@@ -286,8 +394,18 @@ def run_sqlmap():
             "listDb": list_db_minimal,
         }
 
-    # batch support
+    # -------------------------
+    # Batch support (list body)
+    # -------------------------
     if isinstance(body, list):
+        # Determine createPdf flag: prefer explicit query param, else first item flag, else False
+        create_pdf = False
+        qv = request.args.get("createPdf")
+        if qv is not None and str(qv).lower() in ("1", "true", "yes", "on"):
+            create_pdf = True
+        elif body and isinstance(body[0], dict) and body[0].get("createPdf"):
+            create_pdf = True
+
         requested_max_concurrency = body[0].get("maxConcurrency") if body and isinstance(body[0], dict) else None
         try:
             max_concurrency = int(request.args.get("maxConcurrency") or requested_max_concurrency or DEFAULT_MAX_CONCURRENCY)
@@ -309,29 +427,46 @@ def run_sqlmap():
                 if not result.get("ok", False):
                     all_ok = False
         results_sorted = sorted(results, key=lambda x: x["index"])
-        return {"ok": all_ok, "results": results_sorted}, 200 if all_ok else 207
 
+        response = {"ok": all_ok, "results": results_sorted}
+        status_code = 200 if all_ok else 207
+
+        if create_pdf:
+            try:
+                # generate PDF from results_sorted
+                pdf_path = generate_pdf_report(results_sorted)
+                # return filesystem path to PDF (as in sqlmap_urls.py). Optionally you can convert to URL here.
+                response["reportPdf"] = pdf_path
+            except Exception as e:
+                return {"ok": False, "error": f"Report generation failed: {e}"}, 500
+
+        return response, status_code
+
+    # -------------------------
+    # Single object support
+    # -------------------------
     if not isinstance(body, dict):
         return {"ok": False, "error": "Request body must be an object or list"}, 400
 
+    # Check if single-request asks for PDF
+    create_pdf_single = False
+    qv_single = request.args.get("createPdf")
+    if qv_single is not None and str(qv_single).lower() in ("1", "true", "yes", "on"):
+        create_pdf_single = True
+    elif body.get("createPdf"):
+        create_pdf_single = True
+
     result = run_one(body)
     status = 200 if result.get("ok", False) else 500
-    return result, status
 
-@bp.route("/api/upload-report", methods=["POST"])
-def upload_report():
-    try:
-        filename = request.args.get("filename") or request.headers.get("X-Filename") or "report.pdf"
-        safe_name = re.sub(r"[^A-Za-z0-9_\-\.]+", "_", filename)
-        if not safe_name.lower().endswith(".pdf"):
-            safe_name += ".pdf"
-        base_dir = os.path.join(os.path.dirname(__file__), "..", "files")
-        base_dir = os.path.abspath(base_dir)
-        os.makedirs(base_dir, exist_ok=True)
-        out_path = os.path.join(base_dir, safe_name)
-        raw = request.get_data() or b""
-        with open(out_path, "wb") as f:
-            f.write(raw)
-        return {"ok": True, "path": out_path.replace("\\", "/"), "filename": safe_name}
-    except Exception as e:
-        return {"ok": False, "error": str(e)}, 500
+    # If PDF requested for single item, wrap into list and generate
+    if create_pdf_single:
+        try:
+            wrapped = [{"index": 0, "url": body.get("url"), **result}]
+            pdf_path = generate_pdf_report(wrapped)
+            result["reportPdf"] = pdf_path
+        except Exception as e:
+            return {"ok": False, "error": f"Report generation failed: {e}"}, 500
+            
+
+    return result, status
