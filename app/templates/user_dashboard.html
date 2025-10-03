@@ -3,45 +3,57 @@
 
 <head>
     <meta charset="utf-8">
-    <title>User Dashboard</title>
+    <title>Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
 
-    <!-- DataTables CSS -->
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-    
-    <!-- Axios -->
-    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-    
-    <!-- jQuery -->
+    <!-- jQuery ก่อน DataTables -->
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-    <!-- DataTables JS -->
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </head>
 
 <body class="bg-light">
 
-    <div class="container mt-5">
-        <div class="d-flex justify-content-between mb-3">
-            <h2>User Dashboard</h2>
-            <button class="btn btn-danger" id="logoutBtn">Logout</button>
+    <!-- Navbar -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="nav-links">
+                    <!-- JS จะเติมลิงก์ตามสิทธิ์ -->
+                </ul>
+                <button class="btn btn-outline-danger" id="logoutBtn">Logout</button>
+            </div>
         </div>
-        <div id="welcome" class="mb-3"></div>
-        <p>นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)</p>
+    </nav>
+
+    <!-- Content -->
+    <div class="container mt-5">
+        <div class="card shadow p-4 mb-4">
+            <h2 id="dashboard-title" class="mb-3">Dashboard</h2>
+            <div id="welcome" class="mb-3"></div>
+            <p class="text-muted" id="role-info"></p>
+        </div>
 
         <!-- ตาราง Log -->
-        <div class="card shadow p-4 mt-4">
-            <h3 class="mb-3">ประวัติการเข้าสู่ระบบของคุณ</h3>
+        <div class="card shadow p-4">
+            <h3 class="mb-3" id="log-title">ประวัติการเข้าสู่ระบบ</h3>
             <div class="table-responsive">
-                <table class="table table-striped table-bordered align-middle" id="userLogTable">
+                <table class="table table-striped table-bordered align-middle" id="logTable">
                     <thead class="table-dark">
-                        <tr>
-                            <th scope="col">เวลา</th>
-                            <th scope="col">IP</th>
-                            <th scope="col">User Agent</th>
-                            <th scope="col">สถานะ</th>
+                        <tr id="log-header">
+                            <!-- JS จะเติม column -->
                         </tr>
                     </thead>
                     <tbody>
@@ -56,34 +68,80 @@
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const token = localStorage.getItem("access_token");
-            if (!token) {
-                console.warn("No access token found");
-                return;
-            }
+            if (!token) return console.warn("No access token found");
 
-            const table = $('#userLogTable').DataTable({
-                columns: [
+            const isAdmin = localStorage.getItem("is_admin") === "true";
+
+            // แสดง Navbar ตามสิทธิ์
+            const navLinks = document.getElementById("nav-links");
+            navLinks.innerHTML = `
+                <li class="nav-item"><a class="nav-link active" href="#">Dashboard</a></li>
+                ${isAdmin ? `<li class="nav-item"><a class="nav-link" href="/sqlmap_urls">SQLMap URLs</a></li>` : ""}
+                <li class="nav-item"><a class="nav-link" href="/sqlmap_basic">SQLMap Basic Scanner</a></li>
+            `;
+
+            // กำหนดข้อความ role และ column table
+            const dashboardTitle = document.getElementById("dashboard-title");
+            const roleInfo = document.getElementById("role-info");
+            const logTitle = document.getElementById("log-title");
+            const logHeader = document.getElementById("log-header");
+
+            let columns, endpoint;
+
+            if (isAdmin) {
+                dashboardTitle.innerText = "Admin Dashboard";
+                roleInfo.innerText = "นี่คือหน้าสำหรับผู้ดูแลระบบ (is_admin=1)";
+                logTitle.innerText = "ประวัติการเข้าสู่ระบบของผู้ใช้ทั้งหมด";
+                logHeader.innerHTML = `
+                    <th scope="col">เวลา</th>
+                    <th scope="col">Username</th>
+                    <th scope="col">IP</th>
+                    <th scope="col">User Agent</th>
+                    <th scope="col">สถานะ</th>
+                `;
+                columns = [
+                    { data: 'created_at' },
+                    { data: 'username' },
+                    { data: 'ip_address' },
+                    { data: 'user_agent' },
+                    { data: 'success' }
+                ];
+                endpoint = "/api/logs/all";
+            } else {
+                dashboardTitle.innerText = "User Dashboard";
+                roleInfo.innerText = "นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)";
+                logTitle.innerText = "ประวัติการเข้าสู่ระบบของคุณ";
+                logHeader.innerHTML = `
+                    <th scope="col">เวลา</th>
+                    <th scope="col">IP</th>
+                    <th scope="col">User Agent</th>
+                    <th scope="col">สถานะ</th>
+                `;
+                columns = [
                     { data: 'created_at' },
                     { data: 'ip_address' },
                     { data: 'user_agent' },
                     { data: 'success' }
-                ],
-                order: [[0, 'desc']],
-            });
+                ];
+                endpoint = "/api/logs/me";
+            }
+
+            // Init DataTable
+            const table = $('#logTable').DataTable({ columns, order: [[0, 'desc']] });
 
             async function loadLogs() {
                 try {
-                    const res = await axios.get("/api/logs/me", {
-                        headers: { Authorization: "Bearer " + token }
+                    const res = await axios.get(endpoint, { headers: { Authorization: "Bearer " + token } });
+                    const logs = res.data.map(l => {
+                        let obj = {
+                            created_at: new Date(l.created_at).toLocaleString(),
+                            ip_address: l.ip_address || "-",
+                            user_agent: l.user_agent || "-",
+                            success: l.success ? "✅ Success" : "❌ Failed"
+                        };
+                        if (isAdmin) obj.username = l.username || "-";
+                        return obj;
                     });
-
-                    const logs = res.data.map(l => ({
-                        created_at: new Date(l.created_at).toLocaleString(),
-                        ip_address: l.ip_address || "-",
-                        user_agent: l.user_agent || "-",
-                        success: l.success ? "✅ Success" : "❌ Failed"
-                    }));
-
                     table.clear();
                     table.rows.add(logs);
                     table.draw();
@@ -92,15 +150,14 @@
                 }
             }
 
-            // โหลดครั้งแรก
+            // โหลดครั้งแรกและ refresh ทุก 1 นาที
             loadLogs();
-
-            // ตั้งเวลาโหลดใหม่ทุก 1 นาที
             setInterval(loadLogs, 60 * 1000);
         });
     </script>
 
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+
 </body>
 </html>

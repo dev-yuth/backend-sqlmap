@@ -4,6 +4,12 @@ from .config import Config
 from .extensions import db, jwt, cors, migrate
 from .routes import register_routes
 
+# --- import โมเดลเพื่อให้ Alembic detect ---
+from app.models.user import User
+from app.models.login_log import LoginLog
+from app.models.api_process import ApiProcess
+
+
 def create_app(config_object: object | None = None):
     app = Flask(__name__, static_folder="static", static_url_path="/static")
     app.config.from_object(config_object or Config)
