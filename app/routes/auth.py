@@ -23,19 +23,56 @@ def register():
     db.session.commit()
     return {"ok": True, "user": u.to_dict()}, 201
 
+from app.models.login_log import LoginLog
+
 @bp.route("/login", methods=["POST"])
 def login():
     data = request.get_json() or {}
     identifier = data.get("username") or data.get("email")
     password = data.get("password")
     if not identifier or not password:
-        return {"msg":"missing credentials"}, 400
-    user = User.query.filter((User.username==identifier) | (User.email==identifier)).first()
+        return {"msg": "missing credentials"}, 400
+
+    user = User.query.filter(
+        (User.username == identifier) | (User.email == identifier)
+    ).first()
+
+    ip = request.remote_addr
+    ua = request.headers.get("User-Agent", "")
+
     if not user or not user.check_password(password):
-        return {"msg":"invalid credentials"}, 401
+        # log failed
+        log = LoginLog(
+            user_id=user.id if user else None,
+            username=identifier,
+            ip_address=ip,
+            user_agent=ua,
+            success=False,
+        )
+        db.session.add(log)
+        db.session.commit()
+        return {"msg": "invalid credentials"}, 401
+
+    # login success
     access = create_access_token(identity=str(user.id))
     refresh = create_refresh_token(identity=str(user.id))
-    return {"access_token": access, "refresh_token": refresh, "user": user.to_dict()}
+
+    log = LoginLog(
+        user_id=user.id,
+        username=user.username,
+        ip_address=ip,
+        user_agent=ua,
+        success=True,
+    )
+    db.session.add(log)
+    db.session.commit()
+
+    return {
+        "access_token": access,
+        "refresh_token": refresh,
+        "user": user.to_dict(),
+    }
+
 
 @bp.route("/refresh", methods=["POST"])
 @jwt_required(refresh=True)

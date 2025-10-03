@@ -5,27 +5,102 @@
     <meta charset="utf-8">
     <title>User Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <!-- DataTables CSS -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
+    <!-- Axios -->
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    
+    <!-- jQuery -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <!-- DataTables JS -->
+    <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
+    <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
+
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
 </head>
 
 <body class="bg-light">
-       <!-- dashboard.js โหลดก่อน -->
-      
+
     <div class="container mt-5">
         <div class="d-flex justify-content-between mb-3">
             <h2>User Dashboard</h2>
             <button class="btn btn-danger" id="logoutBtn">Logout</button>
         </div>
-        <div id="welcome"></div>
+        <div id="welcome" class="mb-3"></div>
         <p>นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)</p>
+
+        <!-- ตาราง Log -->
+        <div class="card shadow p-4 mt-4">
+            <h3 class="mb-3">ประวัติการเข้าสู่ระบบของคุณ</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle" id="userLogTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col">เวลา</th>
+                            <th scope="col">IP</th>
+                            <th scope="col">User Agent</th>
+                            <th scope="col">สถานะ</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Axios จะเติมข้อมูลตรงนี้ -->
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small">อัปเดตอัตโนมัติทุก 1 นาที</p>
+        </div>
     </div>
 
- 
-    <!-- logout.js โหลดหลัง DOM render -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const token = localStorage.getItem("access_token");
+            if (!token) {
+                console.warn("No access token found");
+                return;
+            }
+
+            const table = $('#userLogTable').DataTable({
+                columns: [
+                    { data: 'created_at' },
+                    { data: 'ip_address' },
+                    { data: 'user_agent' },
+                    { data: 'success' }
+                ],
+                order: [[0, 'desc']],
+            });
+
+            async function loadLogs() {
+                try {
+                    const res = await axios.get("/api/logs/me", {
+                        headers: { Authorization: "Bearer " + token }
+                    });
+
+                    const logs = res.data.map(l => ({
+                        created_at: new Date(l.created_at).toLocaleString(),
+                        ip_address: l.ip_address || "-",
+                        user_agent: l.user_agent || "-",
+                        success: l.success ? "✅ Success" : "❌ Failed"
+                    }));
+
+                    table.clear();
+                    table.rows.add(logs);
+                    table.draw();
+                } catch (err) {
+                    console.error("Error loading logs:", err);
+                }
+            }
+
+            // โหลดครั้งแรก
+            loadLogs();
+
+            // ตั้งเวลาโหลดใหม่ทุก 1 นาที
+            setInterval(loadLogs, 60 * 1000);
+        });
+    </script>
+
     <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
- 
-
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
-
 </html>

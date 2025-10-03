@@ -64,3 +64,6 @@ async function logout() {
 
 // ให้เรียก loadDashboard() ตั้งแต่เริ่ม
 loadDashboard();
+
+
+
