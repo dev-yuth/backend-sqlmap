@@ -20,6 +20,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFontFamily  # เพิ่มบรรทัดนี้
 from reportlab.lib.units import cm
 
 from flask_jwt_extended import jwt_required
@@ -135,13 +136,57 @@ ALLOWED_FLAGS = {
 }
 EXTRA_ARG_SAFE_RE = re.compile(r"^[-]{1,2}[A-Za-z0-9\-\._/]+=?.*$")
 
-# --- PDF utilities (copied/adapted from sqlmap_urls.py) ---
-THAI_FONT_NAME = "THSarabunNew"
+# --- PDF utilities ---
+THAI_FONT_NAME = "Sarabun"
+
+# หา path ของโฟลเดอร์ app/fonts
+project_app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+font_dir = os.path.join(project_app_dir, "fonts")
+
+# กำหนดไฟล์ฟอนต์ทั้ง 4 แบบ
+font_files = {
+    'regular': 'Sarabun-Regular.ttf',
+    'bold': 'Sarabun-Bold.ttf',
+    'italic': 'Sarabun-Italic.ttf',
+    'bolditalic': 'Sarabun-BoldItalic.ttf'
+}
+
 try:
-    pdfmetrics.registerFont(TTFont(THAI_FONT_NAME, "THSarabunNew.ttf"))
+    # ตรวจสอบว่าโฟลเดอร์ fonts มีอยู่หรือไม่
+    if not os.path.exists(font_dir):
+        raise FileNotFoundError(f"Font directory not found: {font_dir}")
+    
+    # ลงทะเบียนฟอนต์ทั้ง 4 แบบ
+    registered_fonts = {}
+    for variant, filename in font_files.items():
+        font_path = os.path.join(font_dir, filename)
+        if not os.path.exists(font_path):
+            print(f"Warning: {filename} not found at {font_path}")
+            continue
+        
+        font_name = f"{THAI_FONT_NAME}-{variant}" if variant != 'regular' else THAI_FONT_NAME
+        pdfmetrics.registerFont(TTFont(font_name, font_path))
+        registered_fonts[variant] = font_name
+        print(f"Registered: {font_name} from {filename}")
+    
+    # ตรวจสอบว่ามีฟอนต์ regular อย่างน้อย
+    if 'regular' not in registered_fonts:
+        raise FileNotFoundError("Sarabun-Regular.ttf is required but not found")
+    
+    # ลงทะเบียน font family
+    registerFontFamily(
+        THAI_FONT_NAME,
+        normal=registered_fonts.get('regular', THAI_FONT_NAME),
+        bold=registered_fonts.get('bold', registered_fonts['regular']),
+        italic=registered_fonts.get('italic', registered_fonts['regular']),
+        boldItalic=registered_fonts.get('bolditalic', registered_fonts['regular'])
+    )
+    
+    print(f"Registered Sarabun font family successfully")
+    
 except Exception as e:
-    # don't raise — just warn (Flask logs will show it)
-    print(f"Warning: Thai font registration failed: {e}")
+    print(f"Error: Thai font registration failed: {e}")
+    raise
 
 def thai_datetime_str():
     months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -233,7 +278,7 @@ def health():
     return {"ok": True, "service": "sqlmap-api", "version": 1}, 200
 
 @bp.route("/api/run-sqlmap", methods=["POST"])
-@jwt_required()
+@jwt_required(locations=["cookies"])  # ✅ เพิ่ม locations=["cookies"]
 def run_sqlmap():
     try:
         body = request.get_json(force=True, silent=False) or {}

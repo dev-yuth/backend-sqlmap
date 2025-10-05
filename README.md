@@ -82,3 +82,21 @@ py -3 -m flask --app manage.py db upgrade
 pip freeze > requirements.txt
 
 pip install -r requirements.txt
+
+
+:: create venv
+py -3 -m venv .venv
+
+:: activate (Command Prompt)
+venv\Scripts\activate
+
+:: upgrade pip then install
+py -3 -m pip install --upgrade pip
+py -3 -m pip install -r requirements.txt
+
+
+
+
+.venv\Scripts\activate
+python -m pip install -r requirements.txt
+python manage.py

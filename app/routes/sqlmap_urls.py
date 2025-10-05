@@ -19,6 +19,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.lib import colors
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.pdfbase.pdfmetrics import registerFontFamily  # เพิ่มบรรทัดนี้
 from reportlab.lib.units import cm
 
 
@@ -239,11 +240,57 @@ def _run_cmd(cmd: List[str], timeout_seconds: int) -> Dict[str, Any]:
     }
 
 # --- Register Thai font ---
-THAI_FONT_NAME = "THSarabunNew"
+THAI_FONT_NAME = "Sarabun"
+
+# หา path ของโฟลเดอร์ app/fonts
+project_app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+font_dir = os.path.join(project_app_dir, "fonts")
+
+# กำหนดไฟล์ฟอนต์ทั้ง 4 แบบ
+font_files = {
+    'regular': 'Sarabun-Regular.ttf',
+    'bold': 'Sarabun-Bold.ttf',
+    'italic': 'Sarabun-Italic.ttf',
+    'bolditalic': 'Sarabun-BoldItalic.ttf'
+}
+
 try:
-    pdfmetrics.registerFont(TTFont(THAI_FONT_NAME, "THSarabunNew.ttf"))
+    # ตรวจสอบว่าโฟลเดอร์ fonts มีอยู่หรือไม่
+    if not os.path.exists(font_dir):
+        raise FileNotFoundError(f"Font directory not found: {font_dir}")
+    
+    # ลงทะเบียนฟอนต์ทั้ง 4 แบบ
+    registered_fonts = {}
+    for variant, filename in font_files.items():
+        font_path = os.path.join(font_dir, filename)
+        if not os.path.exists(font_path):
+            print(f"Warning: {filename} not found at {font_path}")
+            continue
+        
+        font_name = f"{THAI_FONT_NAME}-{variant}" if variant != 'regular' else THAI_FONT_NAME
+        pdfmetrics.registerFont(TTFont(font_name, font_path))
+        registered_fonts[variant] = font_name
+        print(f"Registered: {font_name} from {filename}")
+    
+    # ตรวจสอบว่ามีฟอนต์ regular อย่างน้อย
+    if 'regular' not in registered_fonts:
+        raise FileNotFoundError("Sarabun-Regular.ttf is required but not found")
+    
+    # ลงทะเบียน font family (ใช้ regular ถ้าไม่มี variant)
+    registerFontFamily(
+        THAI_FONT_NAME,
+        normal=registered_fonts.get('regular', THAI_FONT_NAME),
+        bold=registered_fonts.get('bold', registered_fonts['regular']),
+        italic=registered_fonts.get('italic', registered_fonts['regular']),
+        boldItalic=registered_fonts.get('bolditalic', registered_fonts['regular'])
+    )
+    
+    print(f"Registered Sarabun font family successfully")
+    
 except Exception as e:
-    print(f"Warning: Thai font registration failed: {e}")
+    print(f"Error: Thai font registration failed: {e}")
+    raise  # ให้แสดง error เพื่อดีบัก
+
 
 def thai_datetime_str():
     months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
@@ -330,7 +377,7 @@ def generate_pdf_report(results: List[Dict[str, Any]]) -> str:
 
 # --- endpoint: POST /api/run-sqlmap-urls ---
 @bp.route("/api/run-sqlmap-urls", methods=["POST"])
-@jwt_required()
+@jwt_required(locations=["cookies"])  # ✅ เพิ่ม locations=["cookies"]
 def run_sqlmap_urls_post():
     python_path = get_python_path()
     sqlmap_path = get_sqlmap_path()

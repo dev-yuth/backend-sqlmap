@@ -1,37 +1,52 @@
 <!doctype html>
 <html lang="en">
-
 <head>
-    <meta charset="utf-8">
-    <title>Redirecting...</title>
+  <meta charset="utf-8">
+  <title>Redirecting...</title>
 </head>
-
 <body>
-    <script>
-        const token = localStorage.getItem('access_token');
-        if (!token) {
-            window.location.replace('/login');
-        } else {
-            fetch('/api/user/me', {
-                headers: { 'Authorization': 'Bearer ' + token }
-            })
-                .then(res => {
-                    if (!res.ok) throw new Error("unauthorized");
-                    return res.json();
-                })
-                .then(user => {
-                    if (user.is_admin) {
-                        window.location.replace('/admin/dashboard');
-                    } else {
-                        window.location.replace('/user/dashboard');
-                    }
-                })
-                .catch(() => {
-                    localStorage.clear();
-                    window.location.replace('/login');
-                });
-        }
-    </script>
-</body>
+<script>
+// ✅ ตรวจสอบว่ามี CSRF token หรือไม่ (แทนการเช็ค access_token)
+const accessCsrf = localStorage.getItem('access_csrf');
+const isAdmin = localStorage.getItem('is_admin');
 
+if (!accessCsrf) {
+    // ไม่มี CSRF token = ยังไม่ได้ login
+    window.location.replace('/login');
+} else {
+    // ✅ เรียก API โดยใช้ cookies (JWT อยู่ใน cookies อัตโนมัติ)
+    fetch('/api/user/me', {
+        method: 'GET',
+        credentials: 'include', // ✅ ส่ง cookies ไปด้วย
+        headers: {
+            'X-CSRF-TOKEN': accessCsrf, // ✅ ส่ง CSRF token
+            'Accept': 'application/json'
+        }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("unauthorized");
+        return res.json();
+    })
+    .then(user => {
+        // ✅ เก็บข้อมูล user ใหม่
+        localStorage.setItem('user_id', user.id);
+        localStorage.setItem('username', user.username);
+        localStorage.setItem('is_admin', user.is_admin);
+
+        // ✅ redirect ตาม role
+        if (user.is_admin) {
+            window.location.replace('/admin/dashboard');
+        } else {
+            window.location.replace('/user/dashboard');
+        }
+    })
+    .catch(err => {
+        console.error('Auth check failed:', err);
+        // ✅ ล้าง localStorage และ redirect ไป login
+        localStorage.clear();
+        window.location.replace('/login');
+    });
+}
+</script>
+</body>
 </html>

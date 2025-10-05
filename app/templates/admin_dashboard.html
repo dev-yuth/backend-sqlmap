@@ -1,3 +1,4 @@
+<!-- admin_dashboard.html -->
 <!doctype html>
 <html lang="en">
 
@@ -57,7 +58,7 @@
                         </tr>
                     </thead>
                     <tbody>
-                        <!-- Axios จะเติมข้อมูลตรงนี้ -->
+                        <!-- DataTables จะเติมข้อมูลตรงนี้ -->
                     </tbody>
                 </table>
             </div>
@@ -67,10 +68,18 @@
 
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            const token = localStorage.getItem("access_token");
-            if (!token) return console.warn("No access token found");
+            // ✅ เช็ค CSRF token แทน access_token
+            const accessCsrf = localStorage.getItem("access_csrf");
+            if (!accessCsrf) {
+                console.warn("No CSRF token found, redirecting to login");
+                return window.location.href = '/login';
+            }
 
             const isAdmin = localStorage.getItem("is_admin") === "true";
+
+            // ✅ ตั้งค่า Axios defaults ให้ส่ง cookies และ CSRF token อัตโนมัติ
+            axios.defaults.withCredentials = true;
+            axios.defaults.headers.common['X-CSRF-TOKEN'] = accessCsrf;
 
             // แสดง Navbar ตามสิทธิ์
             const navLinks = document.getElementById("nav-links");
@@ -131,7 +140,9 @@
 
             async function loadLogs() {
                 try {
-                    const res = await axios.get(endpoint, { headers: { Authorization: "Bearer " + token } });
+                    // ✅ Axios จะส่ง cookies และ CSRF token อัตโนมัติจาก defaults
+                    const res = await axios.get(endpoint);
+                    
                     const logs = res.data.map(l => {
                         let obj = {
                             created_at: new Date(l.created_at).toLocaleString(),
@@ -142,11 +153,30 @@
                         if (isAdmin) obj.username = l.username || "-";
                         return obj;
                     });
+                    
                     table.clear();
                     table.rows.add(logs);
                     table.draw();
                 } catch (err) {
                     console.error("Error loading logs:", err);
+                    
+                    // ✅ ถ้า 401 = token หมดอายุ, ลอง refresh
+                    if (err.response && err.response.status === 401) {
+                        console.warn("Token expired, attempting refresh...");
+                        const refreshed = await window.refreshToken();
+                        
+                        if (refreshed) {
+                            // อัพเดท CSRF token ใหม่
+                            const newCsrf = localStorage.getItem("access_csrf");
+                            axios.defaults.headers.common['X-CSRF-TOKEN'] = newCsrf;
+                            // ลองโหลด logs อีกครั้ง
+                            return loadLogs();
+                        } else {
+                            // refresh ไม่สำเร็จ -> logout
+                            localStorage.clear();
+                            window.location.href = '/login';
+                        }
+                    }
                 }
             }
 
@@ -156,7 +186,6 @@
         });
     </script>
 
-    <script src="{{ url_for('static', filename='js/logout.js') }}"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 
 </body>

@@ -1,4 +1,4 @@
-<!-- app/templates/sqlmap_ulrs.html -->
+<!-- app/templates/sqlmap_urls.html -->
 <!doctype html>
 <html lang="th">
 
@@ -8,7 +8,6 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        /* --- Stepper (pure CSS) --- */
         .steps {
             display: flex;
             gap: 1rem;
@@ -170,8 +169,7 @@
                     <input id="startUrl" class="form-control" placeholder="https://example.com" />
                     <button id="scanBtn" class="btn btn-primary">Start Scan</button>
                 </div>
-                <div class="form-text small-muted">ระบบจะ crawl, dedupe แล้วสแกนแต่ละ URL ทีละตัว (หรือขนานได้)
-                    และแสดงความคืบหน้าแบบ step-by-step</div>
+                <div class="form-text small-muted">ระบบจะ crawl, dedupe แล้วสแกนแต่ละ URL ทีละตัว</div>
             </div>
         </div>
 
@@ -230,41 +228,35 @@
         </div>
     </div>
 
-    <!-- Modal: dynamic viewer -->
+    <!-- Modal -->
     <div class="modal fade" id="viewerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 id="viewerTitle" class="modal-title">Result</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <!-- Tabs -->
-                    <ul class="nav nav-tabs mb-3" id="viewerTabs" role="tablist">
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw"
-                                type="button" role="tab">Raw JSON</button>
+                    <ul class="nav nav-tabs mb-3">
+                        <li class="nav-item">
+                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab"
+                                data-bs-target="#tab-raw">Raw JSON</button>
                         </li>
-                        <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet"
-                                type="button" role="tab">Sheet / Parsed</button>
+                        <li class="nav-item">
+                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab"
+                                data-bs-target="#tab-sheet">Sheet / Parsed</button>
                         </li>
                     </ul>
-
                     <div class="tab-content">
-                        <div class="tab-pane fade show active" id="tab-raw" role="tabpanel">
+                        <div class="tab-pane fade show active" id="tab-raw">
                             <pre id="rawJson"
                                 style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
                         </div>
-
-                        <div class="tab-pane fade" id="tab-sheet" role="tabpanel">
-                            <div id="sheetContent">
-                                <!-- dynamic content: parametersRaw and listDb -->
-                            </div>
+                        <div class="tab-pane fade" id="tab-sheet">
+                            <div id="sheetContent"></div>
                         </div>
                     </div>
                 </div>
-
                 <div class="modal-footer">
                     <button id="copyJsonBtn" class="btn btn-sm btn-outline-secondary">Copy JSON</button>
                     <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
@@ -273,27 +265,31 @@
         </div>
     </div>
 
-    <!-- Bootstrap bundle (includes Popper) -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
+        // ✅ เช็ค authentication ก่อน
+        if (!checkAuth()) {
+            // checkAuth() จะ redirect ไป /login อัตโนมัติ
+        }
+
         const $ = id => document.getElementById(id);
         const log = (txt) => { const el = $('activityLog'); el.textContent = (new Date()).toLocaleTimeString() + "  " + txt + "\n" + el.textContent; };
         const setStep = (name, state) => { const el = $('step-' + name); el.classList.remove('active', 'done'); if (state === 'active') el.classList.add('active'); if (state === 'done') el.classList.add('done'); };
         const setStageMsg = (s) => $('stageMsg').textContent = s;
         const setOverallProgress = (percent) => { const pf = $('progressFill'); const p = Math.max(0, Math.min(100, Math.round(percent))); pf.style.width = p + '%'; pf.textContent = p + '%'; };
-        const getAuthHeaders = () => { const token = localStorage.getItem('access_token'); if (!token) return null; return { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token }; };
 
         let abortRequested = false;
-        $('logoutBtn').addEventListener('click', () => { localStorage.removeItem('access_token'); localStorage.removeItem('refresh_token'); window.location.href = '/login'; });
-        $('cancelBtn').addEventListener('click', () => { abortRequested = true; $('cancelBtn').classList.add('d-none'); log('Cancel requested — stopping after current jobs finish.'); });
-
-        // store results per index so modal can fetch them
         const resultsCollector = [];
 
-        // helper to attach icons to url-item (index is integer)
+        $('logoutBtn').addEventListener('click', logout);
+        $('cancelBtn').addEventListener('click', () => {
+            abortRequested = true;
+            $('cancelBtn').classList.add('d-none');
+            log('Cancel requested');
+        });
+
         function attachResultIcons(node, idx) {
-            // create wrapper for actions
             let actions = node.querySelector('.url-actions');
             if (!actions) {
                 actions = document.createElement('div');
@@ -301,7 +297,6 @@
                 node.appendChild(actions);
             }
 
-            // JSON icon button
             const jsonBtn = document.createElement('button');
             jsonBtn.className = 'icon-btn';
             jsonBtn.title = 'ดู raw JSON';
@@ -309,16 +304,14 @@
             jsonBtn.addEventListener('click', () => showViewerModal(idx, 'raw'));
             actions.appendChild(jsonBtn);
 
-            // Sheet icon button
             const sheetBtn = document.createElement('button');
             sheetBtn.className = 'icon-btn';
-            sheetBtn.title = 'ดูชีตข้อมูล (parametersRaw, listDb)';
+            sheetBtn.title = 'ดูชีตข้อมูล';
             sheetBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zM3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3z"/><path d="M5 4h6v1H5V4zm0 2h6v1H5V6zm0 2h6v1H5V8z"/></svg>`;
             sheetBtn.addEventListener('click', () => showViewerModal(idx, 'sheet'));
             actions.appendChild(sheetBtn);
         }
 
-        // show viewer modal for result at index
         function showViewerModal(idx, tab = 'raw') {
             const found = resultsCollector.find(x => x.index === idx);
             const modalEl = document.getElementById('viewerModal');
@@ -330,138 +323,121 @@
             if (!found) {
                 title.textContent = `No result for #${idx + 1}`;
                 rawJson.textContent = 'No data available';
-                sheetContent.innerHTML = '<div class="small-muted">ไม่มีข้อมูล parsed</div>';
+                sheetContent.innerHTML = '<div class="small-muted">ไม่มีข้อมูล</div>';
             } else {
                 title.textContent = `Result for #${idx + 1}`;
-                try {
-                    rawJson.textContent = JSON.stringify(found.result, null, 2);
-                } catch (e) {
-                    rawJson.textContent = String(found.result);
-                }
+                rawJson.textContent = JSON.stringify(found.result, null, 2);
 
-                // build sheet content: parametersRaw (formatted) and listDb (table)
                 const r = found.result;
                 let html = '';
 
-                // listDb
                 if (r.listDb) {
-                    html += `<h6>Databases (${r.listDb.count ?? (r.listDb.names ? r.listDb.names.length : 0)})</h6>`;
+                    html += `<h6>Databases (${r.listDb.count ?? r.listDb.names?.length ?? 0})</h6>`;
                     if (Array.isArray(r.listDb.names) && r.listDb.names.length) {
-                        html += `<div style="max-height:220px; overflow:auto;"><table class="table table-sm table-bordered"><thead><tr><th>#</th><th>Database</th></tr></thead><tbody>`;
+                        html += `<table class="table table-sm table-bordered"><thead><tr><th>#</th><th>Database</th></tr></thead><tbody>`;
                         r.listDb.names.forEach((dbName, i) => {
-                            html += `<tr><td>${i + 1}</td><td style="word-break:break-all">${escapeHtml(String(dbName))}</td></tr>`;
+                            html += `<tr><td>${i + 1}</td><td>${escapeHtml(String(dbName))}</td></tr>`;
                         });
-                        html += `</tbody></table></div>`;
-                    } else {
-                        html += `<div class="small-muted">ไม่มีชื่อฐานข้อมูล</div>`;
+                        html += `</tbody></table>`;
                     }
-                } else {
-                    html += `<div class="small-muted">ไม่มีข้อมูล listDb</div>`;
                 }
 
-                // parametersRaw
                 if (Array.isArray(r.parametersRaw) && r.parametersRaw.length) {
                     html += `<hr><h6>Parameters</h6>`;
                     r.parametersRaw.forEach((p, pi) => {
-                        html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? ('index ' + (p.index ?? pi)))}</div>`;
+                        html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? '')}</div>`;
                         if (p.raw) {
                             html += `<pre style="background:#f8f9fa;padding:8px;border-radius:6px;max-height:220px;overflow:auto;">${escapeHtml(p.raw)}</pre>`;
-                        } else if (p.findings) {
-                            html += `<div>`;
-                            p.findings.forEach(f => {
-                                html += `<div class="mb-1"><div class="fw-semibold small-muted">${escapeHtml(f.type || '')} — ${escapeHtml(f.title || '')}</div><div style="word-break:break-all">${escapeHtml(f.payload || '')}</div></div>`;
-                            });
-                            html += `</div>`;
-                        } else {
-                            html += `<div class="small-muted">ไม่มีรายละเอียด</div>`;
                         }
                         html += `</div>`;
                     });
-                } else {
-                    html += `<hr><div class="small-muted">ไม่มี parametersRaw</div>`;
                 }
 
                 sheetContent.innerHTML = html;
             }
 
-            // switch to requested tab
-            const rawTabBtn = document.querySelector('#raw-tab');
-            const sheetTabBtn = document.querySelector('#sheet-tab');
             if (tab === 'sheet') {
-                const tabTrigger = new bootstrap.Tab(sheetTabBtn);
-                tabTrigger.show();
+                new bootstrap.Tab($('sheet-tab')).show();
             } else {
-                const tabTrigger = new bootstrap.Tab(rawTabBtn);
-                tabTrigger.show();
+                new bootstrap.Tab($('raw-tab')).show();
             }
 
-            // show modal
             viewer.show();
 
-            // copy json
             $('copyJsonBtn').onclick = () => {
-                try {
-                    navigator.clipboard.writeText(rawJson.textContent);
-                    alert('Raw JSON copied to clipboard');
-                } catch (e) {
-                    alert('Copy failed: ' + e);
-                }
+                navigator.clipboard.writeText(rawJson.textContent).then(() => alert('Copied')).catch(() => alert('Failed'));
             };
         }
 
-        // escape helper to avoid HTML injection
         function escapeHtml(s) {
-            return s.replace(/[&<>"'`=\/]/g, function (c) {
-                return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c];
-            });
+            if (!s && s !== 0) return '';
+            return String(s).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c]));
         }
 
-        // main scan click handler (updated to push {index, result} into resultsCollector)
         $('scanBtn').addEventListener('click', async () => {
             abortRequested = false;
             const startUrl = $('startUrl').value.trim();
-            if (!startUrl) { alert('กรุณาใส่ start URL'); return; }
+            if (!startUrl) {
+                alert('กรุณาใส่ start URL');
+                return;
+            }
 
-            const auth = getAuthHeaders();
-            if (!auth) { alert('กรุณา login ก่อน'); return window.location.href = '/login'; }
-
-            // disable scan while running
             $('scanBtn').disabled = true;
-
-            // reset UI
-            setStep('crawl', 'active'); setStep('sqlmap', 'idle'); setStep('pdf', 'idle'); setStep('done', 'idle');
-            setOverallProgress(4); setStageMsg('เริ่มสแกน URL (crawler)');
-            $('urlList').innerHTML = ''; $('activityLog').textContent = ''; $('downloadPdfBtn').classList.add('d-none');
+            setStep('crawl', 'active');
+            setOverallProgress(4);
+            setStageMsg('เริ่มสแกน URL');
+            $('urlList').innerHTML = '';
+            $('activityLog').textContent = '';
+            $('downloadPdfBtn').classList.add('d-none');
             $('cancelBtn').classList.remove('d-none');
-
-            resultsCollector.length = 0; // clear previous
+            resultsCollector.length = 0;
 
             let cleaned_urls = [];
             try {
                 log('Calling /api/crawler/scan ...');
-                const res = await fetch('/api/crawler/scan', { method: 'POST', headers: auth, body: JSON.stringify({ url: startUrl }) });
-                if (res.status === 401) { alert('Auth error — login again'); window.location.href = '/login'; return; }
+                // ✅ ใช้ fetchWithAuth
+                const res = await fetchWithAuth('/api/crawler/scan', {
+                    method: 'POST',
+                    body: JSON.stringify({ url: startUrl })
+                });
+
+                if (!res.ok) throw new Error('Crawler failed');
+
                 const data = await res.json();
-                if (!data.ok) { log('Crawler failed: ' + (data.error || data.msg || JSON.stringify(data))); setStageMsg('Crawl failed'); setOverallProgress(0); $('scanBtn').disabled = false; return; }
+                if (!data.ok) {
+                    log('Crawler failed: ' + (data.error || data.msg));
+                    setStageMsg('Crawl failed');
+                    setOverallProgress(0);
+                    $('scanBtn').disabled = false;
+                    return;
+                }
+
                 cleaned_urls = data.cleaned_urls || [];
-                log(`Crawler returned ${cleaned_urls.length} cleaned URLs (raw ${data.count_raw || 0}).`);
-            } catch (err) { log('Crawler exception: ' + err); setStageMsg('Crawl failed (exception)'); setOverallProgress(0); $('scanBtn').disabled = false; return; }
+                log(`Crawler returned ${cleaned_urls.length} URLs`);
+            } catch (err) {
+                log('Crawler error: ' + err);
+                setStageMsg('Crawl failed');
+                setOverallProgress(0);
+                $('scanBtn').disabled = false;
+                return;
+            }
 
             const urlListEl = $('urlList');
             const items = [];
             cleaned_urls.forEach((u, i) => {
                 const div = document.createElement('div');
-                div.className = 'url-item'; div.dataset.index = i;
-                div.innerHTML = `<div style="flex:1;"><div style="font-size:0.9rem;word-break:break-all">${u}</div><div class="small-muted">#${i + 1}</div></div><div><div id="status-${i}" class="url-status status-pending">PENDING</div></div>`;
+                div.className = 'url-item';
+                div.dataset.index = i;
+                div.innerHTML = `<div style="flex:1;"><div style="font-size:0.9rem;word-break:break-all">${u}</div></div><div><div id="status-${i}" class="url-status status-pending">PENDING</div></div>`;
                 urlListEl.appendChild(div);
                 items.push({ url: u, index: i, node: div });
             });
 
-            setStep('crawl', 'done'); setStep('sqlmap', 'active'); setStageMsg('รัน SQLMap ทีละ URL');
+            setStep('crawl', 'done');
+            setStep('sqlmap', 'active');
+            setStageMsg('รัน SQLMap');
 
             let completed = 0, total = items.length;
-            setOverallProgress((completed / Math.max(1, total)) * 60 + 10);
-
             const queue = items.slice();
 
             const worker = async () => {
@@ -469,40 +445,42 @@
                     const it = queue.shift();
                     const idx = it.index, url = it.url;
                     const statusEl = $('status-' + idx);
+
                     try {
-                        statusEl.className = 'url-status status-running'; statusEl.textContent = 'RUNNING';
-                        log(`Starting sqlmap for #${idx + 1} ${url}`);
-                        const payload = { cleaned_urls: [url], maxConcurrency: 1, createPdf: false }; // <--- never create per-URL PDF
-                        const resp = await fetch('/api/run-sqlmap-urls', { method: 'POST', headers: auth, body: JSON.stringify(payload) });
-                        if (resp.status === 401) { alert('Auth error — login again'); window.location.href = '/login'; return; }
+                        statusEl.className = 'url-status status-running';
+                        statusEl.textContent = 'RUNNING';
+                        log(`Starting #${idx + 1} ${url}`);
+
+                        const payload = { cleaned_urls: [url], maxConcurrency: 1, createPdf: false };
+                        // ✅ ใช้ fetchWithAuth
+                        const resp = await fetchWithAuth('/api/run-sqlmap-urls', {
+                            method: 'POST',
+                            body: JSON.stringify(payload)
+                        });
+
+                        if (!resp.ok) throw new Error('Request failed');
+
                         const data = await resp.json();
-                        if (data && data.results && data.results.length) {
+                        if (data?.results?.length) {
                             const r = data.results[0];
-                            // store result with index for later viewing
                             resultsCollector.push({ index: idx, result: r });
 
                             if (r.ok) {
                                 statusEl.className = 'url-status status-ok';
                                 statusEl.textContent = 'OK';
-                                log(`#${idx + 1} OK — DBs: ${r.listDb?.count || (r.listDb?.names?.length ?? 0)}`);
-                                // attach icons (json / sheet)
+                                log(`#${idx + 1} OK — DBs: ${r.listDb?.count ?? 0}`);
                                 attachResultIcons(it.node, idx);
                             } else {
                                 statusEl.className = 'url-status status-fail';
                                 statusEl.textContent = 'FAILED';
-                                log(`#${idx + 1} FAILED — ${r.error || 'no details'}`);
-                                // still attach icons so user can inspect
+                                log(`#${idx + 1} FAILED`);
                                 attachResultIcons(it.node, idx);
                             }
-                        } else {
-                            statusEl.className = 'url-status status-fail';
-                            statusEl.textContent = 'NO-RESULT';
-                            log(`#${idx + 1} — no results returned`);
                         }
                     } catch (err) {
                         statusEl.className = 'url-status status-fail';
                         statusEl.textContent = 'ERROR';
-                        log(`#${idx + 1} exception: ${err}`);
+                        log(`#${idx + 1} error: ${err}`);
                     } finally {
                         completed++;
                         setOverallProgress(10 + (completed / Math.max(1, total)) * 60);
@@ -514,28 +492,47 @@
             for (let i = 0; i < Math.min(2, items.length); i++) workers.push(worker());
             await Promise.all(workers);
 
-            if (abortRequested) { setStageMsg('Canceled'); log('Scan canceled by user.'); setStep('sqlmap', 'done'); setOverallProgress(Math.min(100, 10 + (completed / Math.max(1, total)) * 60)); $('cancelBtn').classList.add('d-none'); $('scanBtn').disabled = false; return; }
+            if (abortRequested) {
+                setStageMsg('Canceled');
+                log('Canceled');
+                setStep('sqlmap', 'done');
+                $('cancelBtn').classList.add('d-none');
+                $('scanBtn').disabled = false;
+                return;
+            }
 
-            setStep('sqlmap', 'done'); setStageMsg('SQLMap phase finished');
-
-            // ---------- generate combined PDF after scan ----------
-            setStep('pdf', 'active'); setStageMsg('Generating PDF...');
-            log('Requesting server to generate combined PDF');
+            setStep('sqlmap', 'done');
+            setStep('pdf', 'active');
+            setStageMsg('Generating PDF...');
+            log('Generating PDF');
 
             try {
-                const finalResp = await fetch('/api/run-sqlmap-urls', { method: 'POST', headers: auth, body: JSON.stringify({ cleaned_urls: cleaned_urls, maxConcurrency: 2, createPdf: true }) });
-                if (finalResp.status === 401) { alert('Auth error — login again'); window.location.href = '/login'; return; }
-                const finalData = await finalResp.json();
-                if (finalData.reportPdf) {
-                    $('downloadPdfBtn').href = finalData.reportPdf; $('downloadPdfBtn').classList.remove('d-none'); $('downloadPdfBtn').textContent = 'ดาวน์โหลด PDF รวมทั้งหมด';
-                    log('Combined PDF ready: ' + finalData.reportPdf);
-                } else { log('Server did not return combined PDF.'); }
-            } catch (err) { log('Error requesting combined PDF: ' + err); }
+                // ✅ ใช้ fetchWithAuth
+                const finalResp = await fetchWithAuth('/api/run-sqlmap-urls', {
+                    method: 'POST',
+                    body: JSON.stringify({ cleaned_urls, maxConcurrency: 2, createPdf: true })
+                });
 
-            setOverallProgress(95); setStep('pdf', 'done');
-            setStep('done', 'active'); setStageMsg('All done'); setOverallProgress(100); setStep('done', 'done');
-            log('Scan finished.');
-            $('cancelBtn').classList.add('d-none'); $('scanBtn').disabled = false;
+                if (finalResp.ok) {
+                    const finalData = await finalResp.json();
+                    if (finalData.reportPdf) {
+                        $('downloadPdfBtn').href = finalData.reportPdf;
+                        $('downloadPdfBtn').classList.remove('d-none');
+                        log('PDF ready: ' + finalData.reportPdf);
+                    }
+                }
+            } catch (err) {
+                log('PDF error: ' + err);
+            }
+
+            setStep('pdf', 'done');
+            setStep('done', 'active');
+            setStageMsg('Done');
+            setOverallProgress(100);
+            setStep('done', 'done');
+            log('Finished');
+            $('cancelBtn').classList.add('d-none');
+            $('scanBtn').disabled = false;
         });
     </script>
 </body>
