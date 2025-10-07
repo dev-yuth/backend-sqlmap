@@ -1,192 +1,260 @@
-<!-- admin_dashboard.html -->
 <!doctype html>
 <html lang="en">
-
 <head>
     <meta charset="utf-8">
-    <title>Dashboard</title>
+    <title>User Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-
-    <!-- jQuery ก่อน DataTables -->
+    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
+    
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/jquery.dataTables.min.js"></script>
     <script src="https://cdn.datatables.net/1.13.6/js/dataTables.bootstrap5.min.js"></script>
-    <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
-
-    <!-- Axios -->
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
-
+    
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <script src="{{ url_for('static', filename='js/dashboard-common.js') }}"></script>
+
+    <style>
+        .badge-success { background-color: #28a745; }
+        .badge-danger { background-color: #dc3545; }
+        .table-section { margin-bottom: 3rem; }
+    </style>
 </head>
 
 <body class="bg-light">
-
     <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">Dashboard</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
-                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+            <a class="navbar-brand" href="#">User Dashboard</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
-
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="nav-links">
-                    <!-- JS จะเติมลิงก์ตามสิทธิ์ -->
-                </ul>
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="nav-links"></ul>
                 <button class="btn btn-outline-danger" id="logoutBtn">Logout</button>
             </div>
         </div>
     </nav>
 
-    <!-- Content -->
     <div class="container mt-5">
+        <!-- Header Card -->
         <div class="card shadow p-4 mb-4">
-            <h2 id="dashboard-title" class="mb-3">Dashboard</h2>
-            <div id="welcome" class="mb-3"></div>
-            <p class="text-muted" id="role-info"></p>
+            <h2 class="mb-3">User Dashboard</h2>
+            <p class="text-muted">นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)</p>
         </div>
 
-        <!-- ตาราง Log -->
-        <div class="card shadow p-4">
-            <h3 class="mb-3" id="log-title">ประวัติการเข้าสู่ระบบ</h3>
+        <!-- Process History Table -->
+        <div class="card shadow p-4 table-section">
+            <h3 class="mb-3">ประวัติการทำงาน SQLMap ของคุณ</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle" id="processTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Endpoint</th>
+                            <th>จำนวน Payload</th>
+                            <th>สถานะ</th>
+                            <th>PDF</th>
+                            <th></th>
+                            <th>เวลา</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p class="text-muted small">แสดงข้อมูล 100 รายการล่าสุด</p>
+        </div>
+
+        <!-- Login Log Table -->
+        <div class="card shadow p-4 table-section">
+            <h3 class="mb-3">ประวัติการเข้าสู่ระบบของคุณ</h3>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered align-middle" id="logTable">
                     <thead class="table-dark">
-                        <tr id="log-header">
-                            <!-- JS จะเติม column -->
+                        <tr>
+                            <th>เวลา</th>
+                            <th>IP</th>
+                            <th>User Agent</th>
+                            <th>สถานะ</th>
                         </tr>
                     </thead>
-                    <tbody>
-                        <!-- DataTables จะเติมข้อมูลตรงนี้ -->
-                    </tbody>
+                    <tbody></tbody>
                 </table>
             </div>
             <p class="text-muted small">อัปเดตอัตโนมัติทุก 1 นาที</p>
         </div>
     </div>
 
+    <!-- Detail Modal -->
+    <div class="modal fade" id="detailModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">รายละเอียดการสแกน</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="detailContent" class="p-2">
+                        <p class="text-muted">กำลังโหลด...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
-            // ✅ เช็ค CSRF token แทน access_token
-            const accessCsrf = localStorage.getItem("access_csrf");
-            if (!accessCsrf) {
-                console.warn("No CSRF token found, redirecting to login");
-                return window.location.href = '/login';
+            const DC = window.DashboardCommon;
+            
+            // ตรวจสอบ Auth
+            if (!DC.initAuth()) return;
+            
+            const isAdmin = DC.getUserRole();
+
+            // สร้าง Navbar
+            DC.renderNavbar(isAdmin);
+
+            // ตั้งค่า DataTables
+            const processTable = $('#processTable').DataTable({
+                columns: [
+                    { data: 'id' },
+                    { data: 'endpoint' },
+                    { data: 'payload_count' },
+                    {
+                        data: 'status_ok',
+                        render: (data) => DC.statusBadge(data)
+                    },
+                    {
+                        data: null,
+                        render: (data, type, row) => DC.pdfButton(row.id, row.result_pdf)
+                    },
+                    {
+                        data: null,
+                        render: (data, type, row) => 
+                            `<button class="btn btn-sm btn-info view-details" data-id="${row.id}">🔍 ดู</button>`
+                    },
+                    {
+                        data: 'created_at',
+                        render: (data) => DC.formatDate(data)
+                    }
+                ],
+                order: [[0, 'desc']],
+                pageLength: 10
+            });
+
+            const logTable = $('#logTable').DataTable({
+                columns: [
+                    { 
+                        data: 'created_at',
+                        render: (data) => DC.formatDate(data)
+                    },
+                    { 
+                        data: 'ip_address',
+                        render: (data) => data || '-'
+                    },
+                    { 
+                        data: 'user_agent',
+                        render: (data) => data || '-'
+                    },
+                    { 
+                        data: 'success',
+                        render: (data) => data ? "✅ Success" : "❌ Failed"
+                    }
+                ],
+                order: [[0, 'desc']],
+                pageLength: 5
+            });
+
+            // โหลดข้อมูล Process
+            async function loadProcesses() {
+                await DC.fetchData(
+                    "/api/processes/me",
+                    (data) => {
+                        processTable.clear().rows.add(data).draw();
+                    },
+                    (err) => DC.handleAuthError(err, loadProcesses)
+                );
             }
 
-            const isAdmin = localStorage.getItem("is_admin") === "true";
-
-            // ✅ ตั้งค่า Axios defaults ให้ส่ง cookies และ CSRF token อัตโนมัติ
-            axios.defaults.withCredentials = true;
-            axios.defaults.headers.common['X-CSRF-TOKEN'] = accessCsrf;
-
-            // แสดง Navbar ตามสิทธิ์
-            const navLinks = document.getElementById("nav-links");
-            navLinks.innerHTML = `
-                <li class="nav-item"><a class="nav-link active" href="#">Dashboard</a></li>
-                ${isAdmin ? `<li class="nav-item"><a class="nav-link" href="/sqlmap_urls">SQLMap URLs</a></li>` : ""}
-                <li class="nav-item"><a class="nav-link" href="/sqlmap_basic">SQLMap Basic Scanner</a></li>
-            `;
-
-            // กำหนดข้อความ role และ column table
-            const dashboardTitle = document.getElementById("dashboard-title");
-            const roleInfo = document.getElementById("role-info");
-            const logTitle = document.getElementById("log-title");
-            const logHeader = document.getElementById("log-header");
-
-            let columns, endpoint;
-
-            if (isAdmin) {
-                dashboardTitle.innerText = "Admin Dashboard";
-                roleInfo.innerText = "นี่คือหน้าสำหรับผู้ดูแลระบบ (is_admin=1)";
-                logTitle.innerText = "ประวัติการเข้าสู่ระบบของผู้ใช้ทั้งหมด";
-                logHeader.innerHTML = `
-                    <th scope="col">เวลา</th>
-                    <th scope="col">Username</th>
-                    <th scope="col">IP</th>
-                    <th scope="col">User Agent</th>
-                    <th scope="col">สถานะ</th>
-                `;
-                columns = [
-                    { data: 'created_at' },
-                    { data: 'username' },
-                    { data: 'ip_address' },
-                    { data: 'user_agent' },
-                    { data: 'success' }
-                ];
-                endpoint = "/api/logs/all";
-            } else {
-                dashboardTitle.innerText = "User Dashboard";
-                roleInfo.innerText = "นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)";
-                logTitle.innerText = "ประวัติการเข้าสู่ระบบของคุณ";
-                logHeader.innerHTML = `
-                    <th scope="col">เวลา</th>
-                    <th scope="col">IP</th>
-                    <th scope="col">User Agent</th>
-                    <th scope="col">สถานะ</th>
-                `;
-                columns = [
-                    { data: 'created_at' },
-                    { data: 'ip_address' },
-                    { data: 'user_agent' },
-                    { data: 'success' }
-                ];
-                endpoint = "/api/logs/me";
-            }
-
-            // Init DataTable
-            const table = $('#logTable').DataTable({ columns, order: [[0, 'desc']] });
-
+            // โหลดข้อมูล Logs
             async function loadLogs() {
-                try {
-                    // ✅ Axios จะส่ง cookies และ CSRF token อัตโนมัติจาก defaults
-                    const res = await axios.get(endpoint);
-                    
-                    const logs = res.data.map(l => {
-                        let obj = {
-                            created_at: new Date(l.created_at).toLocaleString(),
-                            ip_address: l.ip_address || "-",
-                            user_agent: l.user_agent || "-",
-                            success: l.success ? "✅ Success" : "❌ Failed"
-                        };
-                        if (isAdmin) obj.username = l.username || "-";
-                        return obj;
-                    });
-                    
-                    table.clear();
-                    table.rows.add(logs);
-                    table.draw();
-                } catch (err) {
-                    console.error("Error loading logs:", err);
-                    
-                    // ✅ ถ้า 401 = token หมดอายุ, ลอง refresh
-                    if (err.response && err.response.status === 401) {
-                        console.warn("Token expired, attempting refresh...");
-                        const refreshed = await window.refreshToken();
-                        
-                        if (refreshed) {
-                            // อัพเดท CSRF token ใหม่
-                            const newCsrf = localStorage.getItem("access_csrf");
-                            axios.defaults.headers.common['X-CSRF-TOKEN'] = newCsrf;
-                            // ลองโหลด logs อีกครั้ง
-                            return loadLogs();
-                        } else {
-                            // refresh ไม่สำเร็จ -> logout
-                            localStorage.clear();
-                            window.location.href = '/login';
+                await DC.fetchData(
+                    "/api/logs/me",
+                    (data) => {
+                        logTable.clear().rows.add(data).draw();
+                    },
+                    (err) => DC.handleAuthError(err, loadLogs)
+                );
+            }
+
+            // แสดงรายละเอียด Process
+            $('#processTable tbody').on('click', '.view-details', function () {
+                const row = processTable.row($(this).closest('tr')).data();
+                showProcessDetails(row);
+            });
+
+            function showProcessDetails(row) {
+                const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+                const content = document.getElementById('detailContent');
+
+                let html = `<h5>🔎 Endpoint: <code>${row.endpoint}</code></h5>`;
+                html += `<p>สถานะ: ${DC.statusBadge(row.status_ok)}</p><hr>`;
+
+                if (!row.result_json) {
+                    html += `<p class="text-danger">ไม่พบข้อมูล JSON</p>`;
+                } else {
+                    try {
+                        const data = typeof row.result_json === 'string' 
+                            ? JSON.parse(row.result_json) 
+                            : row.result_json;
+
+                        // ฐานข้อมูลที่พบ
+                        if (data.listDb?.names?.length) {
+                            html += `<h6>📚 ฐานข้อมูลที่พบ (${data.listDb.names.length}):</h6><ol>`;
+                            data.listDb.names.forEach(db => html += `<li>${db}</li>`);
+                            html += `</ol><hr>`;
                         }
+
+                        // Parameters
+                        if (data.parametersRaw?.length) {
+                            html += `<h6>🎯 Parameters (${data.parametersRaw.length}):</h6>`;
+                            data.parametersRaw.forEach((param, idx) => {
+                                html += `
+                                    <div class="border rounded p-2 mb-2">
+                                        <strong>#${idx + 1}. ${param.parameter || '(ไม่ระบุ parameter)'}</strong><br>
+                                        <small>Method: ${param.method || '-'} | Type: ${param.type || '-'}</small>
+                                        <ul class="mt-2">
+                                `;
+                                if (param.findings?.length) {
+                                    param.findings.forEach(f => {
+                                        html += `<li><b>Payload:</b> <code>${f.payload}</code><br><b>Vector:</b> ${f.vector || '-'}</li>`;
+                                    });
+                                } else {
+                                    html += `<li><em>ไม่พบ findings</em></li>`;
+                                }
+                                html += `</ul></div>`;
+                            });
+                        } else {
+                            html += `<p class="text-muted">ไม่พบ parametersRaw</p>`;
+                        }
+                    } catch (err) {
+                        html += `<p class="text-danger">ไม่สามารถแสดงข้อมูล JSON ได้</p>`;
+                        console.error("Error parsing result_json:", err);
                     }
                 }
+
+                content.innerHTML = html;
+                modal.show();
             }
 
-            // โหลดครั้งแรกและ refresh ทุก 1 นาที
-            loadLogs();
-            setInterval(loadLogs, 60 * 1000);
+            // Auto Refresh
+            DC.setupAutoRefresh([loadProcesses, loadLogs]);
         });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
-
 </body>
 </html>
