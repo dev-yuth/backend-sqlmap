@@ -10,22 +10,12 @@ import subprocess
 import datetime
 
 from flask import Blueprint, request, current_app
+from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.config import get_python_path, get_sqlmap_path
-
-# --- PDF (reportlab) ---
-from reportlab.lib.pagesizes import A4
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle, PageBreak
-from reportlab.lib.styles import getSampleStyleSheet
-from reportlab.lib import colors
-from reportlab.pdfbase import pdfmetrics
-from reportlab.pdfbase.ttfonts import TTFont
-from reportlab.pdfbase.pdfmetrics import registerFontFamily  # เพิ่มบรรทัดนี้
-from reportlab.lib.units import cm
-
-from flask_jwt_extended import jwt_required
-from flask import Blueprint, request, current_app, send_from_directory, url_for, abort
-
+from app.extensions import db
+from app.models.api_process import ApiProcess
+from app.utils.pdf_generator import generate_sqlmap_pdf_report
 
 bp = Blueprint("sqlmap_api", __name__)
 
@@ -136,150 +126,16 @@ ALLOWED_FLAGS = {
 }
 EXTRA_ARG_SAFE_RE = re.compile(r"^[-]{1,2}[A-Za-z0-9\-\._/]+=?.*$")
 
-# --- PDF utilities ---
-THAI_FONT_NAME = "Sarabun"
-
-# หา path ของโฟลเดอร์ app/fonts
-project_app_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-font_dir = os.path.join(project_app_dir, "fonts")
-
-# กำหนดไฟล์ฟอนต์ทั้ง 4 แบบ
-font_files = {
-    'regular': 'Sarabun-Regular.ttf',
-    'bold': 'Sarabun-Bold.ttf',
-    'italic': 'Sarabun-Italic.ttf',
-    'bolditalic': 'Sarabun-BoldItalic.ttf'
-}
-
-try:
-    # ตรวจสอบว่าโฟลเดอร์ fonts มีอยู่หรือไม่
-    if not os.path.exists(font_dir):
-        raise FileNotFoundError(f"Font directory not found: {font_dir}")
-    
-    # ลงทะเบียนฟอนต์ทั้ง 4 แบบ
-    registered_fonts = {}
-    for variant, filename in font_files.items():
-        font_path = os.path.join(font_dir, filename)
-        if not os.path.exists(font_path):
-            print(f"Warning: {filename} not found at {font_path}")
-            continue
-        
-        font_name = f"{THAI_FONT_NAME}-{variant}" if variant != 'regular' else THAI_FONT_NAME
-        pdfmetrics.registerFont(TTFont(font_name, font_path))
-        registered_fonts[variant] = font_name
-        print(f"Registered: {font_name} from {filename}")
-    
-    # ตรวจสอบว่ามีฟอนต์ regular อย่างน้อย
-    if 'regular' not in registered_fonts:
-        raise FileNotFoundError("Sarabun-Regular.ttf is required but not found")
-    
-    # ลงทะเบียน font family
-    registerFontFamily(
-        THAI_FONT_NAME,
-        normal=registered_fonts.get('regular', THAI_FONT_NAME),
-        bold=registered_fonts.get('bold', registered_fonts['regular']),
-        italic=registered_fonts.get('italic', registered_fonts['regular']),
-        boldItalic=registered_fonts.get('bolditalic', registered_fonts['regular'])
-    )
-    
-    print(f"Registered Sarabun font family successfully")
-    
-except Exception as e:
-    print(f"Error: Thai font registration failed: {e}")
-    raise
-
-def thai_datetime_str():
-    months = ['ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.',
-              'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.']
-    d = datetime.datetime.now()
-    return f"{d.day:02d} {months[d.month-1]} {d.year+543} เวลา {d.hour:02d}:{d.minute:02d} น."
-
-def generate_pdf_report(results: List[Dict[str, Any]]) -> str:
-    """
-    Generate a PDF report from results list.
-    Returns absolute path to generated PDF file.
-    """
-    output_dir = os.path.join(os.getcwd(), "app", "files")
-    os.makedirs(output_dir, exist_ok=True)
-    pdf_path = os.path.join(output_dir, f"sqlmap_report_{int(datetime.datetime.now().timestamp())}.pdf")
-
-    doc = SimpleDocTemplate(pdf_path, pagesize=A4,
-                            rightMargin=2*cm, leftMargin=2*cm,
-                            topMargin=2*cm, bottomMargin=2*cm)
-
-    styles = getSampleStyleSheet()
-    # Override default fonts if THAI font loaded
-    for key in styles.byName:
-        try:
-            styles[key].fontName = THAI_FONT_NAME
-        except Exception:
-            pass
-
-    story = []
-
-    # Header
-    story.append(Paragraph("รายงานผลการสแกน SQLMap", styles["Title"]))
-    story.append(Paragraph(f"จัดทำเมื่อ: {thai_datetime_str()}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-
-    # Summary
-    total_items = len(results)
-    total_db_names = sum(len(r.get("listDb", {}).get("names", [])) for r in results)
-    story.append(Paragraph(f"สรุปผล: จำนวนรายการ {total_items} | จำนวนฐานข้อมูลรวม {total_db_names}", styles["Normal"]))
-    story.append(Spacer(1, 12))
-
-    # Details per URL
-    for idx, r in enumerate(results, 1):
-        story.append(Paragraph(f"รายการที่ {idx}: {r.get('url','')}", styles["Heading2"]))
-        story.append(Paragraph(f"สถานะ: {'OK' if r.get('ok') else 'FAILED'}", styles["Normal"]))
-        story.append(Spacer(1, 6))
-
-        # Databases
-        list_db = r.get("listDb", {})
-        db_names = list_db.get("names", [])
-        db_count = list_db.get("count", 0)
-
-        story.append(Paragraph(f"ฐานข้อมูลที่พบ ({db_count}):", styles["Heading3"]))
-        if db_names:
-            data = [["#", "Database Name"]] + [[str(i+1), name] for i, name in enumerate(db_names)]
-            table = Table(data, colWidths=[1.2*cm, 14*cm])
-            table.setStyle(TableStyle([
-                ("GRID", (0,0), (-1,-1), 0.5, colors.black),
-                ("BACKGROUND", (0,0), (-1,0), colors.lightgrey),
-                ("FONTNAME", (0,0), (-1,-1), THAI_FONT_NAME),
-                ("FONTSIZE", (0,0), (-1,-1), 10),
-            ]))
-            story.append(table)
-        else:
-            story.append(Paragraph("ไม่พบฐานข้อมูล", styles["Normal"]))
-        story.append(Spacer(1, 6))
-
-        # Parameters
-        params = r.get("parametersRaw", [])
-        story.append(Paragraph("รายละเอียดพารามิเตอร์:", styles["Heading3"]))
-        if params:
-            for p in params:
-                story.append(Paragraph(f"Parameter: {p.get('parameter')} (Location: {p.get('location')})", styles["Normal"]))
-                for f in p.get("findings", []):
-                    story.append(Paragraph(f"- Type: {f.get('type','')}", styles["Normal"]))
-                    story.append(Paragraph(f"  Title: {f.get('title','')}", styles["Normal"]))
-                    story.append(Paragraph(f"  Payload: {f.get('payload','')}", styles["Normal"]))
-                story.append(Spacer(1, 6))
-        else:
-            story.append(Paragraph("ไม่พบพารามิเตอร์ที่มีช่องโหว่", styles["Normal"]))
-
-        story.append(PageBreak())
-
-    doc.build(story)
-    return pdf_path
-
 @bp.route("/health", methods=["GET"])
 def health():
     return {"ok": True, "service": "sqlmap-api", "version": 1}, 200
 
 @bp.route("/api/run-sqlmap", methods=["POST"])
-@jwt_required(locations=["cookies"])  # ✅ เพิ่ม locations=["cookies"]
+@jwt_required(locations=["cookies"])
 def run_sqlmap():
+    # Get current user ID
+    current_user_id = get_jwt_identity()
+    
     try:
         body = request.get_json(force=True, silent=False) or {}
     except Exception as e:
@@ -443,7 +299,7 @@ def run_sqlmap():
     # Batch support (list body)
     # -------------------------
     if isinstance(body, list):
-        # Determine createPdf flag: prefer explicit query param, else first item flag, else False
+        # Determine createPdf flag
         create_pdf = False
         qv = request.args.get("createPdf")
         if qv is not None and str(qv).lower() in ("1", "true", "yes", "on"):
@@ -476,14 +332,29 @@ def run_sqlmap():
         response = {"ok": all_ok, "results": results_sorted}
         status_code = 200 if all_ok else 207
 
+        report_pdf_path = None
         if create_pdf:
             try:
-                # generate PDF from results_sorted
-                pdf_path = generate_pdf_report(results_sorted)
-                # return filesystem path to PDF (as in sqlmap_urls.py). Optionally you can convert to URL here.
-                response["reportPdf"] = pdf_path
+                report_pdf_path = generate_sqlmap_pdf_report(results_sorted)
+                response["reportPdf"] = report_pdf_path
             except Exception as e:
                 return {"ok": False, "error": f"Report generation failed: {e}"}, 500
+
+        # ✅ บันทึก process ลง database
+        try:
+            process = ApiProcess(
+                user_id=current_user_id,
+                endpoint="/api/run-sqlmap (batch)",
+                payload_count=len(body),
+                status_ok=all_ok,
+                result_pdf=report_pdf_path,
+                result_json=json.dumps(results_sorted, ensure_ascii=False)
+            )
+            db.session.add(process)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            print(f"❌ Error saving process to database: {e}")
 
         return response, status_code
 
@@ -504,14 +375,33 @@ def run_sqlmap():
     result = run_one(body)
     status = 200 if result.get("ok", False) else 500
 
+    report_pdf_path_single = None
     # If PDF requested for single item, wrap into list and generate
     if create_pdf_single:
         try:
             wrapped = [{"index": 0, "url": body.get("url"), **result}]
-            pdf_path = generate_pdf_report(wrapped)
-            result["reportPdf"] = pdf_path
+            report_pdf_path_single = generate_sqlmap_pdf_report(wrapped)
+            result["reportPdf"] = report_pdf_path_single
+
+                # ✅ บันทึก process ลง database (single)
+            try:
+                process = ApiProcess(
+                    user_id=current_user_id,
+                    endpoint="/api/run-sqlmap (single)",
+                    payload_count=1,
+                    status_ok=result.get("ok", False),
+                    result_pdf=report_pdf_path_single,
+                    result_json=json.dumps([result], ensure_ascii=False)
+                )
+                db.session.add(process)
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                print(f"❌ Error saving process to database: {e}")
+
         except Exception as e:
             return {"ok": False, "error": f"Report generation failed: {e}"}, 500
-            
+
+
 
     return result, status

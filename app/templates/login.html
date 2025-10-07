@@ -43,7 +43,7 @@
 
       try {
         const body = JSON.stringify({ username, password });
-        console.log("SENDING BODY:", body);
+        // console.log("SENDING BODY:", body);
         const res = await fetch('/api/auth/login', {
           method: 'POST',
           credentials: 'include',

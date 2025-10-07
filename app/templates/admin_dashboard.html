@@ -1,4 +1,4 @@
-<!-- admin_dashboard.html -->
+<!-- app/templates/admin_dashboard.html -->
 <!doctype html>
 <html lang="en">
 
@@ -17,6 +17,12 @@
     <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
 
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    
+    <style>
+        .badge-success { background-color: #28a745; }
+        .badge-danger { background-color: #dc3545; }
+        .table-section { margin-bottom: 3rem; }
+    </style>
 </head>
 
 <body class="bg-light">
@@ -47,8 +53,26 @@
             <p class="text-muted" id="role-info"></p>
         </div>
 
-        <!-- ตาราง Log -->
-        <div class="card shadow p-4">
+        <!-- ตาราง Process History -->
+        <div class="card shadow p-4 table-section">
+            <h3 class="mb-3" id="process-title">ประวัติการทำงาน SQLMap</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle" id="processTable">
+                    <thead class="table-dark">
+                        <tr id="process-header">
+                            <!-- JS จะเติม column -->
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- DataTables จะเติมข้อมูลตรงนี้ -->
+                    </tbody>
+                </table>
+            </div>
+            <p class="text-muted small">แสดงข้อมูล 100-200 รายการล่าสุด</p>
+        </div>
+
+        <!-- ตาราง Login Log -->
+        <div class="card shadow p-4 table-section">
             <h3 class="mb-3" id="log-title">ประวัติการเข้าสู่ระบบ</h3>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered align-middle" id="logTable">
@@ -92,60 +116,167 @@
             // กำหนดข้อความ role และ column table
             const dashboardTitle = document.getElementById("dashboard-title");
             const roleInfo = document.getElementById("role-info");
+            const processTitle = document.getElementById("process-title");
+            const processHeader = document.getElementById("process-header");
             const logTitle = document.getElementById("log-title");
             const logHeader = document.getElementById("log-header");
 
-            let columns, endpoint;
+            let logColumns, logEndpoint, processColumns, processEndpoint;
 
             if (isAdmin) {
                 dashboardTitle.innerText = "Admin Dashboard";
                 roleInfo.innerText = "นี่คือหน้าสำหรับผู้ดูแลระบบ (is_admin=1)";
+                
+                // Process History (Admin)
+                processTitle.innerText = "ประวัติการทำงาน SQLMap ของผู้ใช้ทั้งหมด";
+                processHeader.innerHTML = `
+                    <th>ID</th>
+                    <th>Username</th>
+                    <th>Endpoint</th>
+                    <th>จำนวน Url</th>
+                    <th>สถานะ</th>
+                    <th>PDF</th>
+                    <th>เวลา</th>
+                `;
+                processColumns = [
+                    { data: 'id' },
+                    { data: 'username' },
+                    { data: 'endpoint' },
+                    { data: 'payload_count' },
+                    { 
+                        data: 'status_ok',
+                        render: function(data) {
+                            return data ? '<span class="badge badge-success">✅ Success</span>' : '<span class="badge badge-danger">❌ Failed</span>';
+                        }
+                    },
+                    { 
+                        data: 'result_pdf',
+                        render: function(data, type, row) {
+                            if (data) {
+                                return `<a href="/api/processes/${row.id}/pdf" class="btn btn-sm btn-primary" target="_blank">📄 ดาวน์โหลด</a>`;
+                            }
+                            return '-';
+                        }
+                    },
+                    { 
+                        data: 'created_at',
+                        render: function(data) {
+                            return new Date(data).toLocaleString('th-TH');
+                        }
+                    }
+                ];
+                processEndpoint = "/api/processes/all";
+                
+                // Login Log (Admin)
                 logTitle.innerText = "ประวัติการเข้าสู่ระบบของผู้ใช้ทั้งหมด";
                 logHeader.innerHTML = `
-                    <th scope="col">เวลา</th>
-                    <th scope="col">Username</th>
-                    <th scope="col">IP</th>
-                    <th scope="col">User Agent</th>
-                    <th scope="col">สถานะ</th>
+                    <th>เวลา</th>
+                    <th>Username</th>
+                    <th>IP</th>
+                    <th>User Agent</th>
+                    <th>สถานะ</th>
                 `;
-                columns = [
+                logColumns = [
                     { data: 'created_at' },
                     { data: 'username' },
                     { data: 'ip_address' },
                     { data: 'user_agent' },
                     { data: 'success' }
                 ];
-                endpoint = "/api/logs/all";
+                logEndpoint = "/api/logs/all";
             } else {
                 dashboardTitle.innerText = "User Dashboard";
                 roleInfo.innerText = "นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)";
+                
+                // Process History (User)
+                processTitle.innerText = "ประวัติการทำงาน SQLMap ของคุณ";
+                processHeader.innerHTML = `
+                    <th>ID</th>
+                    <th>Endpoint</th>
+                    <th>จำนวน Payload</th>
+                    <th>สถานะ</th>
+                    <th>PDF</th>
+                    <th>เวลา</th>
+                `;
+                processColumns = [
+                    { data: 'id' },
+                    { data: 'endpoint' },
+                    { data: 'payload_count' },
+                    { 
+                        data: 'status_ok',
+                        render: function(data) {
+                            return data ? '<span class="badge badge-success">✅ Success</span>' : '<span class="badge badge-danger">❌ Failed</span>';
+                        }
+                    },
+                    { 
+                        data: 'result_pdf',
+                        render: function(data, type, row) {
+                            if (data) {
+                                return `<a href="/api/processes/${row.id}/pdf" class="btn btn-sm btn-primary" target="_blank">📄 ดาวน์โหลด</a>`;
+                            }
+                            return '-';
+                        }
+                    },
+                    { 
+                        data: 'created_at',
+                        render: function(data) {
+                            return new Date(data).toLocaleString('th-TH');
+                        }
+                    }
+                ];
+                processEndpoint = "/api/processes/me";
+                
+                // Login Log (User)
                 logTitle.innerText = "ประวัติการเข้าสู่ระบบของคุณ";
                 logHeader.innerHTML = `
-                    <th scope="col">เวลา</th>
-                    <th scope="col">IP</th>
-                    <th scope="col">User Agent</th>
-                    <th scope="col">สถานะ</th>
+                    <th>เวลา</th>
+                    <th>IP</th>
+                    <th>User Agent</th>
+                    <th>สถานะ</th>
                 `;
-                columns = [
+                logColumns = [
                     { data: 'created_at' },
                     { data: 'ip_address' },
                     { data: 'user_agent' },
                     { data: 'success' }
                 ];
-                endpoint = "/api/logs/me";
+                logEndpoint = "/api/logs/me";
             }
 
-            // Init DataTable
-            const table = $('#logTable').DataTable({ columns, order: [[0, 'desc']] });
+            // Init DataTables
+            const processTable = $('#processTable').DataTable({ 
+                columns: processColumns, 
+                order: [[0, 'desc']],
+                pageLength: 10
+            });
+            
+            const logTable = $('#logTable').DataTable({ 
+                columns: logColumns, 
+                order: [[0, 'desc']],
+                pageLength: 5
+            });
 
+            // Load Process History
+            async function loadProcesses() {
+                try {
+                    const res = await axios.get(processEndpoint);
+                    processTable.clear();
+                    processTable.rows.add(res.data);
+                    processTable.draw();
+                } catch (err) {
+                    console.error("Error loading processes:", err);
+                    await handleAuthError(err);
+                }
+            }
+
+            // Load Login Logs
             async function loadLogs() {
                 try {
-                    // ✅ Axios จะส่ง cookies และ CSRF token อัตโนมัติจาก defaults
-                    const res = await axios.get(endpoint);
+                    const res = await axios.get(logEndpoint);
                     
                     const logs = res.data.map(l => {
                         let obj = {
-                            created_at: new Date(l.created_at).toLocaleString(),
+                            created_at: new Date(l.created_at).toLocaleString('th-TH'),
                             ip_address: l.ip_address || "-",
                             user_agent: l.user_agent || "-",
                             success: l.success ? "✅ Success" : "❌ Failed"
@@ -154,35 +285,41 @@
                         return obj;
                     });
                     
-                    table.clear();
-                    table.rows.add(logs);
-                    table.draw();
+                    logTable.clear();
+                    logTable.rows.add(logs);
+                    logTable.draw();
                 } catch (err) {
                     console.error("Error loading logs:", err);
+                    await handleAuthError(err);
+                }
+            }
+
+            // Handle Authentication Errors
+            async function handleAuthError(err) {
+                if (err.response && err.response.status === 401) {
+                    console.warn("Token expired, attempting refresh...");
+                    const refreshed = await window.refreshToken();
                     
-                    // ✅ ถ้า 401 = token หมดอายุ, ลอง refresh
-                    if (err.response && err.response.status === 401) {
-                        console.warn("Token expired, attempting refresh...");
-                        const refreshed = await window.refreshToken();
-                        
-                        if (refreshed) {
-                            // อัพเดท CSRF token ใหม่
-                            const newCsrf = localStorage.getItem("access_csrf");
-                            axios.defaults.headers.common['X-CSRF-TOKEN'] = newCsrf;
-                            // ลองโหลด logs อีกครั้ง
-                            return loadLogs();
-                        } else {
-                            // refresh ไม่สำเร็จ -> logout
-                            localStorage.clear();
-                            window.location.href = '/login';
-                        }
+                    if (refreshed) {
+                        const newCsrf = localStorage.getItem("access_csrf");
+                        axios.defaults.headers.common['X-CSRF-TOKEN'] = newCsrf;
+                        // Reload data
+                        loadProcesses();
+                        loadLogs();
+                    } else {
+                        localStorage.clear();
+                        window.location.href = '/login';
                     }
                 }
             }
 
             // โหลดครั้งแรกและ refresh ทุก 1 นาที
+            loadProcesses();
             loadLogs();
-            setInterval(loadLogs, 60 * 1000);
+            setInterval(() => {
+                loadProcesses();
+                loadLogs();
+            }, 60 * 1000);
         });
     </script>
 
