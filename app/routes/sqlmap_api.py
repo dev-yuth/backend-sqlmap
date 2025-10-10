@@ -352,6 +352,8 @@ def run_sqlmap():
             )
             db.session.add(process)
             db.session.commit()
+            # ✅ ส่ง ID กลับไปใน response
+            response["processId"] = process.id
         except Exception as e:
             db.session.rollback()
             print(f"❌ Error saving process to database: {e}")

@@ -217,7 +217,8 @@
                         <div id="activityLog" class="small-muted" style="white-space:pre-wrap;"></div>
                     </div>
                     <div class="card-footer text-end">
-                        <a id="downloadPdfBtn" class="btn btn-success btn-sm d-none" target="_blank">ดาวน์โหลด PDF</a>
+                        <a id="downloadPdfBtn" class="btn btn-success btn-sm d-none" target="_blank"
+                            style="font-size: medium;">ดาวน์โหลด PDF</a>
                     </div>
                 </div>
             </div>
@@ -507,7 +508,7 @@
             log('Generating PDF');
 
             try {
-                // ✅ ใช้ fetchWithAuth
+                // ✅ ใช้ fetchWithAuth สำหรับการเรียกครั้งสุดท้ายเพื่อสร้าง PDF
                 const finalResp = await fetchWithAuth('/api/run-sqlmap-urls', {
                     method: 'POST',
                     body: JSON.stringify({ cleaned_urls, maxConcurrency: 2, createPdf: true })
@@ -515,14 +516,22 @@
 
                 if (finalResp.ok) {
                     const finalData = await finalResp.json();
-                    if (finalData.reportPdf) {
-                        $('downloadPdfBtn').href = finalData.reportPdf;
+
+                    // ✅ FIX: สร้าง URL จาก processId ที่ได้รับมาใหม่
+                    if (finalData.reportPdf && finalData.processId) {
+                        const downloadUrl = `/api/processes/${finalData.processId}/pdf`;
+                        $('downloadPdfBtn').href = downloadUrl;
                         $('downloadPdfBtn').classList.remove('d-none');
-                        log('PDF ready: ' + finalData.reportPdf);
+                        log('PDF ready for download.');
+                    } else {
+                        log('PDF generation complete, but no download link returned.');
                     }
+                } else {
+                    // ถ้า request ไม่สำเร็จ
+                    log('PDF generation request failed.');
                 }
             } catch (err) {
-                log('PDF error: ' + err);
+                log('PDF generation error: ' + err);
             }
 
             setStep('pdf', 'done');

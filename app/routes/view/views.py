@@ -1,12 +1,19 @@
 # app/routes/views/views.py
 from flask import Blueprint, render_template, redirect, url_for
-from flask_jwt_extended import jwt_required
+from flask_jwt_extended import jwt_required, get_jwt_identity # เพิ่ม get_jwt_identity
 from app.utils.decorators import admin_required
 
 bp = Blueprint("views", __name__)
 
 @bp.route("/login")
+@jwt_required(locations=["cookies"], optional=True) # ✅ ทำให้ decorator ไม่บังคับ
 def login_page():
+        # ตรวจสอบว่ามี identity (ล็อกอินอยู่) หรือไม่
+    if get_jwt_identity():
+        # ถ้ามี ให้ redirect ไป dashboard ทันทีจากฝั่ง server
+        return redirect(url_for("views.dashboard_page"))
+    
+    # ถ้าไม่มี ก็แสดงหน้า login ตามปกติ
     return render_template("login.html")
 
 @bp.route("/dashboard")

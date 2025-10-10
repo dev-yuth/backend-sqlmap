@@ -312,6 +312,7 @@ def run_sqlmap_urls_post():
     status_code = 200 if all_ok else 207
 
     report_pdf_path = None
+    process_id_for_pdf = None 
     if create_pdf:
         try:
             report_pdf_path = generate_sqlmap_pdf_report(results_sorted)
@@ -327,6 +328,8 @@ def run_sqlmap_urls_post():
                 )
                 db.session.add(process)
                 db.session.commit()
+                 # ✅ เมื่อ commit สำเร็จ เราจะได้ process.id มา
+                process_id_for_pdf = process.id
             except Exception as e:
                 db.session.rollback()
                 print(f"❌ Error saving process to database: {e}")
@@ -342,5 +345,8 @@ def run_sqlmap_urls_post():
     }
     if report_pdf_path:
         response["reportPdf"] = report_pdf_path
+    # ✅ เพิ่ม processId เข้าไปใน response ถ้ามี
+    if process_id_for_pdf:
+        response["processId"] = process_id_for_pdf
 
     return response, status_code

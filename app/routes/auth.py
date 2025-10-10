@@ -116,3 +116,4 @@ def logout():
     resp = make_response({"msg": f"{token_type} token revoked"})
     unset_jwt_cookies(resp)
     return resp
+
