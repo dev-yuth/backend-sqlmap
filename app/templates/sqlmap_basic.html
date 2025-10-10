@@ -1,4 +1,3 @@
-<!-- app/templates/sqlmap_basic.html -->
 <!doctype html>
 <html lang="th">
 
@@ -8,158 +7,29 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .steps {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
-
-        .step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 12rem;
-            text-align: center;
-        }
-
-        .step-circle {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #fff;
-            background: #d1d5db;
-            transition: background .25s ease, transform .15s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        }
-
-        .step-label {
-            font-size: 0.95rem;
-            margin-top: 0.5rem;
-            color: #374151;
-        }
-
-        .step.active .step-circle {
-            background: linear-gradient(90deg, #0ea5a4, #06b6d4);
-            transform: translateY(-4px);
-        }
-
-        .step.done .step-circle {
-            background: linear-gradient(90deg, #10b981, #34d399);
-        }
-
-        .progress-wrap {
-            width: 100%;
-            background: #e6edf0;
-            border-radius: 999px;
-            overflow: hidden;
-            height: 18px;
-            margin-bottom: 0.75rem;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-        }
-
-        .progress-fill {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6);
-            transition: width .35s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .url-list {
-            max-height: 400px;
-            overflow: auto;
-            border: 1px solid #e6edf0;
-            padding: 0.5rem;
-            border-radius: 6px;
-            background: #fff;
-        }
-
-        .url-item {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            padding: 0.35rem 0.25rem;
-            border-bottom: 1px dashed #f1f5f9;
-        }
-
-        .url-item:last-child {
-            border-bottom: none;
-        }
-
-        .url-status {
-            min-width: 95px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 4px 8px;
-            border-radius: 6px;
-            color: #fff;
-        }
-
-        .status-pending {
-            background: #9ca3af;
-        }
-
-        .status-running {
-            background: #06b6d4;
-        }
-
-        .status-ok {
-            background: #10b981;
-        }
-
-        .status-fail {
-            background: #ef4444;
-        }
-
-        .small-muted {
-            font-size: 0.85rem;
-            color: #6b7280;
-        }
-
-        .item-card {
-            background: #f8f9fa;
-            border: 1px solid #dee2e6;
-            border-radius: 6px;
-            padding: 1rem;
-            margin-bottom: 1rem;
-        }
-
-        .url-actions {
-            display: flex;
-            gap: 0.25rem;
-            align-items: center;
-            margin-left: 8px;
-        }
-
-        .icon-btn {
-            background: transparent;
-            border: none;
-            padding: 4px;
-            cursor: pointer;
-            line-height: 0;
-            color: #374151;
-        }
-
-        .icon-btn:hover {
-            color: #000;
-        }
-
-        .url-detail hr {
-            margin: 0.5rem 0;
-            border-color: #e6edf0;
-        }
+        /* CSS styles remain unchanged */
+        .steps { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .step { display: flex; flex-direction: column; align-items: center; width: 12rem; text-align: center; }
+        .step-circle { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; background: #d1d5db; transition: background .25s ease, transform .15s ease; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); }
+        .step-label { font-size: 0.95rem; margin-top: 0.5rem; color: #374151; }
+        .step.active .step-circle { background: linear-gradient(90deg, #0ea5a4, #06b6d4); transform: translateY(-4px); }
+        .step.done .step-circle { background: linear-gradient(90deg, #10b981, #34d399); }
+        .progress-wrap { width: 100%; background: #e6edf0; border-radius: 999px; overflow: hidden; height: 18px; margin-bottom: 0.75rem; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); }
+        .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); transition: width .35s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; }
+        .url-list { max-height: 400px; overflow: auto; border: 1px solid #e6edf0; padding: 0.5rem; border-radius: 6px; background: #fff; }
+        .url-item { display: flex; gap: 0.75rem; align-items: center; padding: 0.35rem 0.25rem; border-bottom: 1px dashed #f1f5f9; }
+        .url-item:last-child { border-bottom: none; }
+        .url-status { min-width: 95px; text-align: center; font-weight: 600; font-size: 0.85rem; padding: 4px 8px; border-radius: 6px; color: #fff; }
+        .status-pending { background: #9ca3af; }
+        .status-running { background: #06b6d4; }
+        .status-ok { background: #10b981; }
+        .status-fail { background: #ef4444; }
+        .small-muted { font-size: 0.85rem; color: #6b7280; }
+        .item-card { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
+        .url-actions { display: flex; gap: 0.25rem; align-items: center; margin-left: 8px; }
+        .icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; line-height: 0; color: #374151; }
+        .icon-btn:hover { color: #000; }
+        .url-detail hr { margin: 0.5rem 0; border-color: #e6edf0; }
     </style>
 </head>
 
@@ -174,36 +44,21 @@
                     <button id="startScan" class="btn btn-primary">Start Scan</button>
                     <a id="downloadPdf" class="btn btn-success btn-sm ms-auto d-none" target="_blank" style="font-size: medium;">ดาวน์โหลด PDF</a>
                 </div>
-
                 <div id="itemsContainer"></div>
             </div>
         </div>
 
         <div class="steps mb-3">
-            <div class="step" id="step-1">
-                <div class="step-circle">1</div>
-                <div class="step-label">Config</div>
-            </div>
-            <div class="step" id="step-2">
-                <div class="step-circle">2</div>
-                <div class="step-label">Scan</div>
-            </div>
-            <div class="step" id="step-3">
-                <div class="step-circle">3</div>
-                <div class="step-label">PDF</div>
-            </div>
-            <div class="step" id="step-4">
-                <div class="step-circle">4</div>
-                <div class="step-label">Done</div>
-            </div>
+            <div class="step" id="step-1"><div class="step-circle">1</div><div class="step-label">Config</div></div>
+            <div class="step" id="step-2"><div class="step-circle">2</div><div class="step-label">Scan</div></div>
+            <div class="step" id="step-3"><div class="step-circle">3</div><div class="step-label">PDF</div></div>
+            <div class="step" id="step-4"><div class="step-circle">4</div><div class="step-label">Done</div></div>
         </div>
 
         <div class="progress-wrap mb-3">
             <div id="progressBar" class="progress-fill">0%</div>
         </div>
-
         <div class="small-muted mb-2" id="stageText">Ready</div>
-
         <div class="url-list" id="urlList"></div>
     </div>
 
@@ -215,14 +70,12 @@
             </div>
             <div class="mb-2">
                 <label class="form-label small">Data (JSON)</label>
-                <textarea data-data class="form-control form-control-sm" rows="2"
-                    placeholder='{"param":"value"}'></textarea>
+                <textarea data-data class="form-control form-control-sm" rows="2" placeholder='{"param":"value"}'></textarea>
             </div>
             <button class="btn btn-danger btn-sm" data-remove>Remove</button>
         </div>
     </template>
 
-    <!-- Viewer Modal -->
     <div class="modal fade" id="viewerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -233,19 +86,15 @@
                 <div class="modal-body">
                     <ul class="nav nav-tabs mb-3" id="viewerTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw"
-                                type="button" role="tab">Raw JSON</button>
+                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw" type="button" role="tab">Raw JSON</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet"
-                                type="button" role="tab">Sheet / Parsed</button>
+                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet" type="button" role="tab">Sheet / Parsed</button>
                         </li>
                     </ul>
-
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="tab-raw" role="tabpanel">
-                            <pre id="rawJson"
-                                style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+                            <pre id="rawJson" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
                         </div>
                         <div class="tab-pane fade" id="tab-sheet" role="tabpanel">
                             <div id="sheetContent"></div>
@@ -260,12 +109,32 @@
         </div>
     </div>
 
+    <div class="modal fade" id="aiModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">AI Payload Analysis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Payload:</h6>
+                    <pre id="aiPayload" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px;"></pre>
+                    <hr>
+                    <h6>Analysis:</h6>
+                    <div id="aiResult" class="small-muted">Loading...</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 
     <script>
-        // ✅ เช็ค authentication ก่อน
         if (!checkAuth()) {
-            // checkAuth() จะ redirect ไป /login อัตโนมัติ
+            // checkAuth() will redirect to /login automatically
         }
 
         const $ = id => document.getElementById(id);
@@ -274,17 +143,11 @@
         const logStage = msg => $('stageText').textContent = msg;
 
         const MAX_ITEMS = 2;
-        const ENDPOINT = '/api/run-sqlmap'; // ✅ ใช้ relative path
-
+        const ENDPOINT = '/api/run-sqlmap';
         const resultsCollector = [];
 
-        function countItems() {
-            return $('itemsContainer').querySelectorAll('[data-item]').length;
-        }
-
-        function updateAddBtn() {
-            $('addItem').disabled = countItems() >= MAX_ITEMS;
-        }
+        function countItems() { return $('itemsContainer').querySelectorAll('[data-item]').length; }
+        function updateAddBtn() { $('addItem').disabled = countItems() >= MAX_ITEMS; }
 
         $('addItem').addEventListener('click', () => {
             if (countItems() >= MAX_ITEMS) {
@@ -294,12 +157,10 @@
             const tpl = document.getElementById('itemTemplate');
             const clone = tpl.content.cloneNode(true);
             const card = clone.querySelector('[data-item]');
-
             clone.querySelector('[data-remove]').addEventListener('click', () => {
                 card.remove();
                 updateAddBtn();
             });
-
             $('itemsContainer').appendChild(clone);
             updateAddBtn();
         });
@@ -309,9 +170,7 @@
             return items.map(item => {
                 const url = item.querySelector('[data-url]').value.trim();
                 const dataStr = item.querySelector('[data-data]').value.trim();
-
                 if (!url) throw new Error('URL required');
-
                 const obj = { url };
                 if (dataStr) {
                     try {
@@ -331,22 +190,49 @@
                 actions.className = 'url-actions';
                 node.appendChild(actions);
             }
-
             const jsonBtn = document.createElement('button');
             jsonBtn.className = 'icon-btn';
-            jsonBtn.title = 'ดู raw JSON';
+            jsonBtn.title = 'View Raw JSON';
             jsonBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M8.5 1.5A.5.5 0 0 1 9 2v12a.5.5 0 0 1-1 0V2a.5.5 0 0 1 .5-.5z"/><path d="M2 2.5A1.5 1.5 0 0 1 3.5 1h1A1.5 1.5 0 0 1 6 2.5v11A1.5 1.5 0 0 1 4.5 15h-1A1.5 1.5 0 0 1 2 13.5v-11zM10 2.5A1.5 1.5 0 0 1 11.5 1h1A1.5 1.5 0 0 1 14 2.5v11a1.5 1.5 0 0 1-1.5 1.5h-1A1.5 1.5 0 0 1 10 13.5v-11z"/></svg>`;
             jsonBtn.addEventListener('click', () => showViewerModal(idx, 'raw'));
             actions.appendChild(jsonBtn);
 
             const sheetBtn = document.createElement('button');
             sheetBtn.className = 'icon-btn';
-            sheetBtn.title = 'ดูชีตข้อมูล';
+            sheetBtn.title = 'View Parsed Data';
             sheetBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" fill="currentColor" viewBox="0 0 16 16"><path d="M4 0h8a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V2a2 2 0 0 1 2-2zM3 2a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V3a1 1 0 0 0-1-1H3z"/><path d="M5 4h6v1H5V4zm0 2h6v1H5V6zm0 2h6v1H5V8z"/></svg>`;
             sheetBtn.addEventListener('click', () => showViewerModal(idx, 'sheet'));
             actions.appendChild(sheetBtn);
         }
+        
+        async function analyzePayload(payload) {
+            const modalEl = document.getElementById('aiModal');
+            const aiModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const payloadEl = document.getElementById('aiPayload');
+            const resultEl = document.getElementById('aiResult');
 
+            payloadEl.textContent = payload;
+            resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
+            aiModal.show();
+
+            try {
+                const res = await fetchWithAuth('/api/llm/analyze-payload', {
+                    method: 'POST',
+                    body: JSON.stringify({ payload })
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    resultEl.innerHTML = `<pre style="white-space: pre-wrap; font-size: 0.9rem;">${escapeHtml(data.analysis)}</pre>`;
+                } else {
+                    resultEl.textContent = 'Error: ' + (data.error || 'Failed to get analysis.');
+                }
+            } catch (err) {
+                console.error('AI Analysis Error:', err);
+                resultEl.textContent = 'An unexpected error occurred.';
+            }
+        }
+
+        // ✅ FIX: The entire function is updated for a more robust event handling
         function showViewerModal(idx, tab = 'raw') {
             const foundObj = resultsCollector.find(x => x.index === idx);
             const modalEl = document.getElementById('viewerModal');
@@ -358,20 +244,16 @@
             if (!foundObj) {
                 title.textContent = `No result for #${idx + 1}`;
                 rawJson.textContent = 'No data available';
-                sheetContent.innerHTML = '<div class="small-muted">ไม่มีข้อมูล</div>';
+                sheetContent.innerHTML = '<div class="small-muted">No data</div>';
             } else {
                 title.textContent = `Result for #${idx + 1}`;
-                try {
-                    rawJson.textContent = JSON.stringify(foundObj.result, null, 2);
-                } catch (e) {
-                    rawJson.textContent = String(foundObj.result);
-                }
-
+                rawJson.textContent = JSON.stringify(foundObj.result, null, 2);
+                
                 const r = foundObj.result;
                 let html = '';
 
                 if (r.listDb) {
-                    html += `<h6>Databases (${r.listDb.count ?? (r.listDb.names ? r.listDb.names.length : 0)})</h6>`;
+                    html += `<h6>Databases (${r.listDb.count ?? r.listDb.names?.length ?? 0})</h6>`;
                     if (Array.isArray(r.listDb.names) && r.listDb.names.length) {
                         html += `<div style="max-height:220px; overflow:auto;"><table class="table table-sm table-bordered"><thead><tr><th>#</th><th>Database</th></tr></thead><tbody>`;
                         r.listDb.names.forEach((dbName, i) => {
@@ -379,7 +261,7 @@
                         });
                         html += `</tbody></table></div>`;
                     } else {
-                        html += `<div class="small-muted">ไม่มีชื่อฐานข้อมูล</div>`;
+                        html += `<div class="small-muted">No database names found.</div>`;
                     }
                 }
 
@@ -387,18 +269,37 @@
                     html += `<hr><h6>Parameters</h6>`;
                     r.parametersRaw.forEach((p, pi) => {
                         html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? ('index ' + (p.index ?? pi)))}</div>`;
-                        if (p.raw) {
-                            html += `<pre style="background:#f8f9fa;padding:8px;border-radius:6px;max-height:220px;overflow:auto;">${escapeHtml(p.raw)}</pre>`;
-                        } else if (p.findings) {
+                        
+                        if (p.findings) { 
                             p.findings.forEach(f => {
-                                html += `<div class="mb-1"><div class="fw-semibold small-muted">${escapeHtml(f.type || '')} — ${escapeHtml(f.title || '')}</div><div style="word-break:break-all">${escapeHtml(f.payload || '')}</div></div>`;
+                                html += `<div class="mb-1 p-2 border rounded">
+                                            <div class="fw-semibold small-muted">${escapeHtml(f.type || 'N/A')} — ${escapeHtml(f.title || 'N/A')}</div>`;
+                                
+                                if (f.payload) {
+                                    // 1. Use a button tag and store payload in a data attribute
+                                    html += `<div class="mt-1" style="word-break:break-all; font-family: monospace; font-size: 0.85rem;">${escapeHtml(f.payload)}</div>
+                                             <div class="mt-2">
+                                                <button class="btn btn-outline-info btn-sm btn-analyze" data-payload="${escapeHtml(f.payload)}">
+                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-robot" viewBox="0 0 16 16"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062Zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a24.767 24.767 0 0 1-1.871-.183.25.25 0 0 0-.068.217l.92.9a.25.25 0 0 0 .393.04l.433-.43a.25.25 0 0 0-.04-.393l-.92-.9a.25.25 0 0 0-.217-.068Zm-2.512.654a.25.25 0 0 0-.346.346l.92.9a.25.25 0 0 0 .346.033l.434-.43a.25.25 0 0 0-.033-.346l-.92-.9a.25.25 0 0 0-.102-.07ZM11.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z"/><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1Zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5ZM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5Z"/></svg>
+                                                    Analyze Payload
+                                                </button>
+                                             </div>`;
+                                }
+                                html += `</div>`;
                             });
                         }
                         html += `</div>`;
                     });
                 }
-
                 sheetContent.innerHTML = html;
+
+                // 2. Add event listeners to all new buttons after they are added to the page
+                sheetContent.querySelectorAll('.btn-analyze').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        const payload = event.currentTarget.dataset.payload;
+                        analyzePayload(payload);
+                    });
+                });
             }
 
             const rawTabBtn = document.querySelector('#raw-tab');
@@ -408,9 +309,7 @@
             } else {
                 new bootstrap.Tab(rawTabBtn).show();
             }
-
             viewer.show();
-
             $('copyJsonBtn').onclick = () => {
                 try {
                     navigator.clipboard.writeText(rawJson.textContent);
@@ -433,15 +332,12 @@
                     alert('Please add at least one item');
                     return;
                 }
-
                 $('urlList').innerHTML = '';
                 $('downloadPdf').classList.add('d-none');
                 setStep(1, 'done'); setStep(2, 'active'); setStep(3, 'idle'); setStep(4, 'idle');
                 logStage('Starting scan...');
                 setProgress(10);
-
                 resultsCollector.length = 0;
-
                 payload.forEach((p, i) => {
                     const div = document.createElement('div');
                     div.className = 'url-item';
@@ -449,31 +345,21 @@
                     div.innerHTML = `<div style="flex:1"><div style="font-size:0.95rem;word-break:break-all">${escapeHtml(p.url)}</div></div><div><div id="status-${i}" class="url-status status-pending">PENDING</div></div>`;
                     $('urlList').appendChild(div);
                 });
-
                 setProgress(20);
                 logStage('Running SQLMap...');
-
                 if (Array.isArray(payload) && payload.length > 0) {
                     payload[0].createPdf = true;
                 }
-
-                // ✅ ใช้ fetchWithAuth จาก dashboard.js
                 const res = await fetchWithAuth(ENDPOINT, {
                     method: 'POST',
                     body: JSON.stringify(payload)
                 });
-
-                if (!res.ok) {
-                    throw new Error('Scan request failed');
-                }
-
+                if (!res.ok) { throw new Error('Scan request failed'); }
                 const data = await res.json();
-
                 setProgress(60);
                 setStep(2, 'done');
                 setStep(3, 'active');
                 logStage('Processing results...');
-
                 if (data.results && Array.isArray(data.results)) {
                     data.results.forEach((r, i) => {
                         const statusEl = $('status-' + i);
@@ -482,20 +368,14 @@
                             statusEl.className = 'url-status ' + (ok ? 'status-ok' : 'status-fail');
                             statusEl.textContent = ok ? 'OK' : 'FAIL';
                         }
-
                         resultsCollector.push({ index: i, result: r });
-
                         const node = document.querySelector(`.url-item[data-index="${i}"]`);
                         if (node) attachResultIcons(node, i);
                     });
                 }
-
                 setProgress(90);
                 setStep(3, 'done');
-
-                // ✅ FIX: สร้าง URL ดาวน์โหลดจาก processId ที่ได้รับมา
                 if (data.reportPdf && data.processId) {
-                    // สร้าง URL ไปยัง endpoint สำหรับดาวน์โหลดไฟล์โดยเฉพาะ
                     const downloadUrl = `/api/processes/${data.processId}/pdf`;
                     $('downloadPdf').href = downloadUrl;
                     $('downloadPdf').classList.remove('d-none');
@@ -503,12 +383,9 @@
                 } else {
                     logStage('Scan complete (no PDF)');
                 }
-
-
                 setStep(4, 'active');
                 setProgress(100);
                 setTimeout(() => setStep(4, 'done'), 300);
-
             } catch (e) {
                 alert('Error: ' + (e?.message || e));
                 logStage('Error: ' + (e?.message || e));
@@ -519,5 +396,4 @@
         setStep(1, 'active');
     </script>
 </body>
-
 </html>

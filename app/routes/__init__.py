@@ -8,6 +8,7 @@ def register_routes(app):
     from .sqlmap_urls import bp as sqlmap_urls_bp
     from .log_api import bp as log_api_bp
     from .process_api import bp as process_api_bp
+    from .llm_api import bp as llm_api_bp
  
 
     app.register_blueprint(auth_bp)
@@ -18,4 +19,5 @@ def register_routes(app):
     app.register_blueprint(sqlmap_urls_bp)
     app.register_blueprint(log_api_bp)
     app.register_blueprint(process_api_bp)
+    app.register_blueprint(llm_api_bp)
 
