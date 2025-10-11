@@ -16,22 +16,22 @@
     <script src="{{ url_for('static', filename='js/dashboard-common.js') }}"></script>
 
     <style>
-        .badge-success {
-            background-color: #28a745;
-        }
+        .badge-success { background-color: #28a745; }
+        .badge-danger { background-color: #dc3545; }
+        .table-section { margin-bottom: 3rem; }
 
-        .badge-danger {
-            background-color: #dc3545;
+        /* 💡 **เพิ่ม:** สไตล์สำหรับ Code Block ในหน้าต่าง AI */
+        #aiResult pre {
+            background-color: #f1f5f9; padding: 1rem; border-radius: 6px;
+            white-space: pre-wrap; word-wrap: break-word; border: 1px solid #e2e8f0;
         }
-
-        .table-section {
-            margin-bottom: 3rem;
+        #aiResult code {
+            font-family: Consolas, 'Courier New', monospace; font-size: 0.9rem; color: #1e293b;
         }
     </style>
 </head>
 
 <body class="bg-light">
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container-fluid">
             <a class="navbar-brand" href="#">User Dashboard</a>
@@ -46,55 +46,41 @@
     </nav>
 
     <div class="container mt-5">
-        <!-- Header Card -->
         <div class="card shadow p-4 mb-4">
             <h2 class="mb-3">User Dashboard</h2>
             <p class="text-muted">นี่คือหน้าสำหรับผู้ใช้งานทั่วไป (is_admin=0)</p>
         </div>
 
-        <!-- Process History Table -->
         <div class="card shadow p-4 table-section">
             <h3 class="mb-3">ประวัติการทำงาน SQLMap ของคุณ</h3>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered align-middle" id="processTable">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
-                            <th>Endpoint</th>
-                            <th>จำนวน Payload</th>
-                            <th>สถานะ</th>
-                            <th>PDF</th>
-                            <th></th>
-                            <th>เวลา</th>
+                            <th>ID</th> <th>Endpoint</th> <th>จำนวน Payload</th>
+                            <th>สถานะ</th> <th>PDF</th> <th></th> <th>เวลา</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
                 </table>
             </div>
-            <p class="text-muted small">แสดงข้อมูล 100 รายการล่าสุด</p>
         </div>
 
-        <!-- Login Log Table -->
         <div class="card shadow p-4 table-section">
-            <h3 class="mb-3">ประวัติการเข้าสู่ระบบของคุณ</h3>
-            <div class="table-responsive">
-                <table class="table table-striped table-bordered align-middle" id="logTable">
-                    <thead class="table-dark">
-                        <tr>
-                            <th>เวลา</th>
-                            <th>IP</th>
-                            <th>User Agent</th>
-                            <th>สถานะ</th>
-                        </tr>
-                    </thead>
-                    <tbody></tbody>
-                </table>
-            </div>
-            <p class="text-muted small">อัปเดตอัตโนมัติทุก 1 นาที</p>
+             <h3 class="mb-3">ประวัติการเข้าสู่ระบบของคุณ</h3>
+             <div class="table-responsive">
+                 <table class="table table-striped table-bordered align-middle" id="logTable">
+                     <thead class="table-dark">
+                         <tr>
+                             <th>เวลา</th> <th>IP</th> <th>User Agent</th> <th>สถานะ</th>
+                         </tr>
+                     </thead>
+                     <tbody></tbody>
+                 </table>
+             </div>
         </div>
     </div>
 
-    <!-- Detail Modal -->
     <div class="modal fade" id="detailModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -103,12 +89,31 @@
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
-                    <div id="detailContent" class="p-2">
-                        <p class="text-muted">กำลังโหลด...</p>
-                    </div>
+                    <div id="detailContent" class="p-2"><p class="text-muted">กำลังโหลด...</p></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">ปิด</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal fade" id="aiModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">AI Vulnerability Analysis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Vulnerability Info:</h6>
+                    <div id="aiPayload" class="p-2 border rounded bg-light"></div>
+                    <hr>
+                    <h6>Remediation Steps:</h6>
+                    <div id="aiResult" class="small-muted">Loading...</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -118,99 +123,86 @@
         document.addEventListener("DOMContentLoaded", function () {
             const DC = window.DashboardCommon;
 
-            // ตรวจสอบ Auth
             if (!DC.initAuth()) return;
+            DC.renderNavbar(DC.getUserRole());
 
-            const isAdmin = DC.getUserRole();
+            // 💡 **เพิ่ม:** ฟังก์ชัน escapeHtml ที่ขาดหายไป
+            function escapeHtml(s) {
+                if (!s && s !== 0) return '';
+                return String(s).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c]));
+            }
 
-            // สร้าง Navbar
-            DC.renderNavbar(isAdmin);
-
-            // ตั้งค่า DataTables
             const processTable = $('#processTable').DataTable({
                 columns: [
-                    { data: 'id' },
-                    { data: 'endpoint' },
-                    { data: 'payload_count' },
-                    {
-                        data: 'status_ok',
-                        render: (data) => DC.statusBadge(data)
-                    },
-                    {
-                        data: null,
-                        render: (data, type, row) => DC.pdfButton(row.id, row.result_pdf)
-                    },
-                    {
-                        data: null,
-                        render: (data, type, row) =>
-                            `<button class="btn btn-sm btn-info view-details" data-id="${row.id}">🔍 ดู</button>`
-                    },
-                    {
-                        data: 'created_at',
-                        render: (data) => DC.formatDate(data)
-                    }
+                    { data: 'id' }, { data: 'endpoint' }, { data: 'payload_count' },
+                    { data: 'status_ok', render: (data) => DC.statusBadge(data) },
+                    { data: null, render: (data, type, row) => DC.pdfButton(row.id, row.result_pdf) },
+                    { data: null, render: (data, type, row) => `<button class="btn btn-sm btn-info view-details" data-id="${row.id}">🔍 ดู</button>` },
+                    { data: 'created_at', render: (data) => DC.formatDate(data) }
                 ],
-                order: [[0, 'desc']],
-                pageLength: 10
+                order: [[0, 'desc']], pageLength: 10
             });
 
             const logTable = $('#logTable').DataTable({
                 columns: [
-                    {
-                        data: 'created_at',
-                        render: (data) => DC.formatDate(data)
-                    },
-                    {
-                        data: 'ip_address',
-                        render: (data) => data || '-'
-                    },
-                    {
-                        data: 'user_agent',
-                        render: (data) => data || '-'
-                    },
-                    {
-                        data: 'success',
-                        render: (data) => data ? "✅ Success" : "❌ Failed"
-                    }
+                    { data: 'created_at', render: (data) => DC.formatDate(data) },
+                    { data: 'ip_address', render: (data) => data || '-' },
+                    { data: 'user_agent', render: (data) => data || '-' },
+                    { data: 'success', render: (data) => data ? "✅ Success" : "❌ Failed" }
                 ],
-                order: [[0, 'desc']],
-                pageLength: 5
+                order: [[0, 'desc']], pageLength: 5
             });
 
-            // โหลดข้อมูล Process
             async function loadProcesses() {
-                await DC.fetchData(
-                    "/api/processes/me",
-                    (data) => {
-                        processTable.clear().rows.add(data).draw();
-                    },
-                    (err) => DC.handleAuthError(err, loadProcesses)
-                );
+                await DC.fetchData("/api/processes/me", (data) => {
+                    processTable.clear().rows.add(data).draw();
+                }, (err) => DC.handleAuthError(err, loadProcesses));
             }
-
-            // โหลดข้อมูล Logs
             async function loadLogs() {
-                await DC.fetchData(
-                    "/api/logs/me",
-                    (data) => {
-                        logTable.clear().rows.add(data).draw();
-                    },
-                    (err) => DC.handleAuthError(err, loadLogs)
-                );
+                await DC.fetchData("/api/logs/me", (data) => {
+                    logTable.clear().rows.add(data).draw();
+                }, (err) => DC.handleAuthError(err, loadLogs));
             }
 
-            // แสดงรายละเอียด Process
             $('#processTable tbody').on('click', '.view-details', function () {
                 const row = processTable.row($(this).closest('tr')).data();
                 showProcessDetails(row);
             });
+            
+            // 💡 **เพิ่ม:** ฟังก์ชัน analyzePayload ที่สมบูรณ์
+            async function analyzePayload(title, type) {
+                const modalEl = document.getElementById('aiModal');
+                const aiModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                const payloadEl = document.getElementById('aiPayload');
+                const resultEl = document.getElementById('aiResult');
+                
+                payloadEl.innerHTML = `<pre style="white-space:pre-wrap; font-size: 0.9rem;"><strong>Title:</strong> ${escapeHtml(title)}\n<strong>Type:</strong> ${escapeHtml(type)}</pre>`;
+                resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
+                aiModal.show();
+                
+                try {
+                    // **แก้ไข:** เรียกใช้ fetchWithAuth() โดยตรง (ไม่มี DC.)
+                    const res = await fetchWithAuth('/api/llm/analyze-payload', {
+                        method: 'POST',
+                        body: JSON.stringify({ title, type })
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.ok) {
+                        resultEl.innerHTML = marked.parse(data.analysis);
+                    } else {
+                        resultEl.textContent = 'Error: ' + (data.error || 'Failed to get analysis.');
+                    }
+                } catch (err) {
+                    console.error('AI Analysis Error:', err);
+                    resultEl.textContent = 'An unexpected error occurred.';
+                }
+            }
 
+            // 💡 **ปรับปรุง:** ยกเครื่องฟังก์ชัน `showProcessDetails` ทั้งหมด
             function showProcessDetails(row) {
-                const modal = new bootstrap.Modal(document.getElementById('detailModal'));
+                const modal = bootstrap.Modal.getOrCreateInstance(document.getElementById('detailModal'));
                 const content = document.getElementById('detailContent');
-
-                let html = `<h5>🔎 Endpoint: <code>${row.endpoint}</code></h5>`;
-                html += `<p>สถานะ: ${DC.statusBadge(row.status_ok)}</p><hr>`;
+                let html = `<h5>🔎 Endpoint: <code>${row.endpoint}</code></h5><p>สถานะ: ${DC.statusBadge(row.status_ok)}</p><hr>`;
 
                 if (!row.result_json) {
                     html += `<p class="text-danger">ไม่พบข้อมูล JSON</p>`;
@@ -220,78 +212,60 @@
                 }
 
                 try {
-                    const result = typeof row.result_json === "string"
-                        ? JSON.parse(row.result_json)
-                        : row.result_json;
-
-                    // ถ้ามีหลาย URL (array)
+                    const result = typeof row.result_json === "string" ? JSON.parse(row.result_json) : row.result_json;
                     const urls = Array.isArray(result) ? result : [result];
 
-                    html += `
-                            <div class="row">
-                                <div class="col-4 border-end pe-2">
+                    html += `<div class="row">
+                                <div class="col-4 border-end pe-2" style="max-height: 60vh; overflow-y: auto;">
                                     <h6>🌐 รายการ URL (${urls.length})</h6>
-                                    <ul class="list-group" id="urlList">
-                                        ${urls.map((u, i) => `
-                                            <li class="list-group-item list-group-item-action" data-index="${i}">
-                                                ${u.url || "(ไม่ระบุ URL)"}
-                                            </li>`).join('')}
+                                    <ul class="list-group" id="urlListInModal">
+                                        ${urls.map((u, i) => `<li class="list-group-item list-group-item-action" style="cursor:pointer;" data-index="${i}">${escapeHtml(u.url || "(ไม่ระบุ URL)")}</li>`).join('')}
                                     </ul>
                                 </div>
-                                <div class="col-8 ps-3">
-                                    <div id="urlDetail">
-                                        <p class="text-muted">คลิก URL ทางซ้ายเพื่อดูรายละเอียด</p>
-                                    </div>
+                                <div class="col-8 ps-3" style="max-height: 60vh; overflow-y: auto;">
+                                    <div id="urlDetailInModal"><p class="text-muted">คลิก URL ทางซ้ายเพื่อดูรายละเอียด</p></div>
                                 </div>
-                            </div>
-                        `;
-
+                            </div>`;
                     content.innerHTML = html;
-
-                    // ✅ เพิ่ม event listener สำหรับคลิกดูรายละเอียดแต่ละ URL
-                    document.querySelectorAll('#urlList li').forEach(li => {
+                    
+                    document.querySelectorAll('#urlListInModal li').forEach(li => {
                         li.addEventListener('click', function () {
-                            const idx = parseInt(this.dataset.index);
-                            document.querySelectorAll('#urlList li').forEach(x => x.classList.remove('active'));
+                            this.parentElement.querySelectorAll('.active').forEach(el => el.classList.remove('active'));
                             this.classList.add('active');
 
-                            const u = urls[idx];
-                            let detail = `<h6>🔗 URL: <code>${u.url || '-'}</code></h6>`;
+                            const u = urls[parseInt(this.dataset.index)];
+                            const urlDetailContainer = document.getElementById('urlDetailInModal');
+                            let detail = `<h6>🔗 URL: <code>${escapeHtml(u.url || '-')}</code></h6>`;
 
-                            // parametersRaw
                             if (u.parametersRaw?.length) {
-                                detail += `<h6 class="mt-3">🎯 Parameters (${u.parametersRaw.length})</h6>`;
-                                u.parametersRaw.forEach((p, i) => {
-                                    detail += `
-                                            <div class="border rounded p-2 mb-2">
-                                                <b>#${i + 1}. ${p.parameter || '-'}</b>
-                                                <small class="d-block text-muted">Method: ${p.method || '-'} | Type: ${p.type || '-'}</small>
-                                                <ul class="mt-2">
-                                                    ${(p.findings || []).map(f =>
-                                        `<li><b>Payload:</b> <code>${f.payload}</code> <br><b>Vector:</b> ${f.vector || '-'}</li>`
-                                    ).join('') || '<li><em>ไม่พบ findings</em></li>'}
-                                                </ul>
-                                            </div>
-                                        `;
+                                detail += `<h6 class="mt-3">🎯 Findings</h6>`;
+                                u.parametersRaw.forEach((p) => {
+                                    (p.findings || []).forEach(f => {
+                                        detail += `
+                                            <div class="border rounded p-2 mb-2 bg-light">
+                                                <div class="fw-semibold small text-muted">${escapeHtml(f.type || p.type || 'N/A')} — ${escapeHtml(f.title || 'N/A')}</div>
+                                                <div class="mt-1"><b>Payload:</b> <code style="word-break:break-all;">${escapeHtml(f.payload)}</code></div>
+                                                <div class="mt-2">
+                                                    <button class="btn btn-sm btn-outline-info btn-analyze" 
+                                                        data-title="${escapeHtml(f.title || f.vector || 'N/A')}" 
+                                                        data-type="${escapeHtml(f.type || p.type || 'N/A')}">
+                                                        🤖 Analyze with AI
+                                                    </button>
+                                                </div>
+                                            </div>`;
+                                    });
                                 });
                             } else {
-                                detail += `<p class="text-muted">ไม่พบ parametersRaw</p>`;
+                                detail += `<p class="text-muted mt-3">ไม่พบช่องโหว่ (No findings)</p>`;
                             }
-
-                            // listDb
-                            if (u.listDb?.names?.length) {
-                                detail += `<h6 class="mt-3">📚 Database Found (${u.listDb.names.length})</h6><ol>`;
-                                u.listDb.names.forEach(db => detail += `<li>${db}</li>`);
-                                detail += `</ol>`;
-                            }
-
-                            // stdout
-                            if (u.stdout) {
-                                detail += `<h6 class="mt-3">🖥️ Console Output</h6>
-                                   <pre class="bg-light border p-2" style="max-height:300px; overflow:auto;">${u.stdout}</pre>`;
-                            }
-
-                            document.getElementById('urlDetail').innerHTML = detail;
+                            
+                            urlDetailContainer.innerHTML = detail;
+                            
+                            urlDetailContainer.querySelectorAll('.btn-analyze').forEach(button => {
+                                button.addEventListener('click', function() {
+                                    analyzePayload(this.dataset.title, this.dataset.type);
+                                });
+                            });
                         });
                     });
 
@@ -300,17 +274,14 @@
                     html += `<p class="text-danger">ไม่สามารถแสดงข้อมูล JSON ได้</p>`;
                     content.innerHTML = html;
                 }
-
                 modal.show();
-
-
             }
 
-            // Auto Refresh
             DC.setupAutoRefresh([loadProcesses, loadLogs]);
         });
     </script>
-
+    
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 

@@ -1,4 +1,3 @@
-<!-- app/templates/sqlmap_urls.html -->
 <!doctype html>
 <html lang="th">
 
@@ -8,149 +7,35 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
-        .steps {
-            display: flex;
-            gap: 1rem;
-            align-items: center;
-            margin-bottom: 1rem;
-            flex-wrap: wrap;
-        }
+        .steps { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
+        .step { display: flex; flex-direction: column; align-items: center; width: 12rem; text-align: center; }
+        .step-circle { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; background: #d1d5db; transition: background .25s ease, transform .15s ease; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); }
+        .step-label { font-size: 0.95rem; margin-top: 0.5rem; color: #374151; }
+        .step.active .step-circle { background: linear-gradient(90deg, #0ea5a4, #06b6d4); transform: translateY(-4px); }
+        .step.done .step-circle { background: linear-gradient(90deg, #10b981, #34d399); }
+        .progress-wrap { width: 100%; background: #e6edf0; border-radius: 999px; overflow: hidden; height: 18px; margin-bottom: 0.75rem; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); }
+        .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); transition: width .35s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; }
+        .url-list { max-height: 280px; overflow: auto; border: 1px solid #e6edf0; padding: 0.5rem; border-radius: 6px; background: #fff; }
+        .url-item { display: flex; gap: 0.75rem; align-items: center; padding: 0.35rem 0.25rem; border-bottom: 1px dashed #f1f5f9; }
+        .url-item:last-child { border-bottom: none; }
+        .url-status { min-width: 95px; text-align: center; font-weight: 600; font-size: 0.85rem; padding: 4px 8px; border-radius: 6px; color: #fff; }
+        .status-pending { background: #9ca3af; }
+        .status-running { background: #06b6d4; }
+        .status-ok { background: #10b981; }
+        .status-fail { background: #ef4444; }
+        .small-muted { font-size: 0.85rem; color: #6b7280; }
+        .url-actions { display: flex; gap: 0.25rem; align-items: center; }
+        .icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; line-height: 0; color: #374151; }
+        .icon-btn:hover { color: #000; }
+        @media (max-width:640px) { .step { width: 48%; } }
 
-        .step {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            width: 12rem;
-            text-align: center;
+        /* 💡 **เพิ่ม:** สไตล์สำหรับ Code Block ในหน้าต่าง AI */
+        #aiResult pre {
+            background-color: #f1f5f9; padding: 1rem; border-radius: 6px;
+            white-space: pre-wrap; word-wrap: break-word; border: 1px solid #e2e8f0;
         }
-
-        .step-circle {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #fff;
-            background: #d1d5db;
-            transition: background .25s ease, transform .15s ease;
-            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
-        }
-
-        .step-label {
-            font-size: 0.95rem;
-            margin-top: 0.5rem;
-            color: #374151;
-        }
-
-        .step.active .step-circle {
-            background: linear-gradient(90deg, #0ea5a4, #06b6d4);
-            transform: translateY(-4px);
-        }
-
-        .step.done .step-circle {
-            background: linear-gradient(90deg, #10b981, #34d399);
-        }
-
-        .progress-wrap {
-            width: 100%;
-            background: #e6edf0;
-            border-radius: 999px;
-            overflow: hidden;
-            height: 18px;
-            margin-bottom: 0.75rem;
-            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
-        }
-
-        .progress-fill {
-            width: 0%;
-            height: 100%;
-            background: linear-gradient(90deg, #6366f1, #8b5cf6);
-            transition: width .35s ease;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: white;
-            font-weight: 600;
-            font-size: 0.85rem;
-        }
-
-        .url-list {
-            max-height: 280px;
-            overflow: auto;
-            border: 1px solid #e6edf0;
-            padding: 0.5rem;
-            border-radius: 6px;
-            background: #fff;
-        }
-
-        .url-item {
-            display: flex;
-            gap: 0.75rem;
-            align-items: center;
-            padding: 0.35rem 0.25rem;
-            border-bottom: 1px dashed #f1f5f9;
-        }
-
-        .url-item:last-child {
-            border-bottom: none;
-        }
-
-        .url-status {
-            min-width: 95px;
-            text-align: center;
-            font-weight: 600;
-            font-size: 0.85rem;
-            padding: 4px 8px;
-            border-radius: 6px;
-            color: #fff;
-        }
-
-        .status-pending {
-            background: #9ca3af;
-        }
-
-        .status-running {
-            background: #06b6d4;
-        }
-
-        .status-ok {
-            background: #10b981;
-        }
-
-        .status-fail {
-            background: #ef4444;
-        }
-
-        .small-muted {
-            font-size: 0.85rem;
-            color: #6b7280;
-        }
-
-        .url-actions {
-            display: flex;
-            gap: 0.25rem;
-            align-items: center;
-        }
-
-        .icon-btn {
-            background: transparent;
-            border: none;
-            padding: 4px;
-            cursor: pointer;
-            line-height: 0;
-            color: #374151;
-        }
-
-        .icon-btn:hover {
-            color: #000;
-        }
-
-        @media (max-width:640px) {
-            .step {
-                width: 48%;
-            }
+        #aiResult code {
+            font-family: Consolas, 'Courier New', monospace; font-size: 0.9rem; color: #1e293b;
         }
     </style>
 </head>
@@ -174,22 +59,10 @@
         </div>
 
         <div class="steps" id="stepsRoot">
-            <div class="step" id="step-crawl">
-                <div class="step-circle">1</div>
-                <div class="step-label">Scan URL</div>
-            </div>
-            <div class="step" id="step-sqlmap">
-                <div class="step-circle">2</div>
-                <div class="step-label">Run SQLMap</div>
-            </div>
-            <div class="step" id="step-pdf">
-                <div class="step-circle">3</div>
-                <div class="step-label">Generate PDF</div>
-            </div>
-            <div class="step" id="step-done">
-                <div class="step-circle">4</div>
-                <div class="step-label">Finished</div>
-            </div>
+            <div class="step" id="step-crawl"><div class="step-circle">1</div><div class="step-label">Scan URL</div></div>
+            <div class="step" id="step-sqlmap"><div class="step-circle">2</div><div class="step-label">Run SQLMap</div></div>
+            <div class="step" id="step-pdf"><div class="step-circle">3</div><div class="step-label">Generate PDF</div></div>
+            <div class="step" id="step-done"><div class="step-circle">4</div><div class="step-label">Finished</div></div>
         </div>
 
         <div class="mb-3">
@@ -209,7 +82,6 @@
                     </div>
                 </div>
             </div>
-
             <div class="col-md-5 mb-3">
                 <div class="card">
                     <div class="card-header">Activity Log</div>
@@ -217,8 +89,7 @@
                         <div id="activityLog" class="small-muted" style="white-space:pre-wrap;"></div>
                     </div>
                     <div class="card-footer text-end">
-                        <a id="downloadPdfBtn" class="btn btn-success btn-sm d-none" target="_blank"
-                            style="font-size: medium;">ดาวน์โหลด PDF</a>
+                        <a id="downloadPdfBtn" class="btn btn-success btn-sm d-none" target="_blank" style="font-size: medium;">ดาวน์โหลด PDF</a>
                     </div>
                 </div>
             </div>
@@ -229,7 +100,6 @@
         </div>
     </div>
 
-    <!-- Modal -->
     <div class="modal fade" id="viewerModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -239,19 +109,12 @@
                 </div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item">
-                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab"
-                                data-bs-target="#tab-raw">Raw JSON</button>
-                        </li>
-                        <li class="nav-item">
-                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab"
-                                data-bs-target="#tab-sheet">Sheet / Parsed</button>
-                        </li>
+                        <li class="nav-item"><button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw">Raw JSON</button></li>
+                        <li class="nav-item"><button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet">Sheet / Parsed</button></li>
                     </ul>
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="tab-raw">
-                            <pre id="rawJson"
-                                style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+                            <pre id="rawJson" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
                         </div>
                         <div class="tab-pane fade" id="tab-sheet">
                             <div id="sheetContent"></div>
@@ -266,13 +129,32 @@
         </div>
     </div>
 
+    <div class="modal fade" id="aiModal" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">AI Vulnerability Analysis</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <h6>Vulnerability Info:</h6>
+                    <div id="aiPayload" class="p-2 border rounded bg-light"></div>
+                    <hr>
+                    <h6>Remediation Steps:</h6>
+                    <div id="aiResult" class="small-muted">Loading...</div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script>
-        // ✅ เช็ค authentication ก่อน
-        if (!checkAuth()) {
-            // checkAuth() จะ redirect ไป /login อัตโนมัติ
-        }
+        if (!checkAuth()) { /* Redirects if not logged in */ }
 
         const $ = id => document.getElementById(id);
         const log = (txt) => { const el = $('activityLog'); el.textContent = (new Date()).toLocaleTimeString() + "  " + txt + "\n" + el.textContent; };
@@ -289,6 +171,40 @@
             $('cancelBtn').classList.add('d-none');
             log('Cancel requested');
         });
+        
+        function escapeHtml(s) {
+            if (!s && s !== 0) return '';
+            return String(s).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c]));
+        }
+
+        // 💡 **เพิ่ม:** ฟังก์ชันสำหรับเรียก API วิเคราะห์ด้วย AI
+        async function analyzePayload(title, type) {
+            const modalEl = document.getElementById('aiModal');
+            const aiModal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            const payloadEl = document.getElementById('aiPayload');
+            const resultEl = document.getElementById('aiResult');
+
+            payloadEl.innerHTML = `<pre style="white-space:pre-wrap; font-size: 0.9rem;"><strong>Title:</strong> ${escapeHtml(title)}\n<strong>Type:</strong> ${escapeHtml(type)}</pre>`;
+            resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
+            aiModal.show();
+            
+            try {
+                const body = { title, type };
+                const res = await fetchWithAuth('/api/llm/analyze-payload', {
+                    method: 'POST',
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json();
+                if (res.ok && data.ok) {
+                    resultEl.innerHTML = marked.parse(data.analysis);
+                } else {
+                    resultEl.textContent = 'Error: ' + (data.error || 'Failed to get analysis.');
+                }
+            } catch (err) {
+                console.error('AI Analysis Error:', err);
+                resultEl.textContent = 'An unexpected error occurred.';
+            }
+        }
 
         function attachResultIcons(node, idx) {
             let actions = node.querySelector('.url-actions');
@@ -297,7 +213,6 @@
                 actions.className = 'url-actions';
                 node.appendChild(actions);
             }
-
             const jsonBtn = document.createElement('button');
             jsonBtn.className = 'icon-btn';
             jsonBtn.title = 'ดู raw JSON';
@@ -313,6 +228,7 @@
             actions.appendChild(sheetBtn);
         }
 
+        // 💡 **ปรับปรุง:** แก้ไขฟังก์ชัน showViewerModal ให้แสดงปุ่ม Analyze
         function showViewerModal(idx, tab = 'raw') {
             const found = resultsCollector.find(x => x.index === idx);
             const modalEl = document.getElementById('viewerModal');
@@ -347,14 +263,37 @@
                     html += `<hr><h6>Parameters</h6>`;
                     r.parametersRaw.forEach((p, pi) => {
                         html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? '')}</div>`;
-                        if (p.raw) {
-                            html += `<pre style="background:#f8f9fa;padding:8px;border-radius:6px;max-height:220px;overflow:auto;">${escapeHtml(p.raw)}</pre>`;
+                        // **สำคัญ:** เปลี่ยนจากการแสดง p.raw มาเป็นการวนลูป p.findings
+                        if (p.findings && Array.isArray(p.findings)) {
+                            p.findings.forEach(f => {
+                                html += `<div class="mt-2 p-2 border rounded">
+                                            <div class="fw-semibold small-muted">${escapeHtml(f.type || 'N/A')} — ${escapeHtml(f.title || 'N/A')}</div>`;
+                                if (f.payload) {
+                                    html += `<div class="mt-1" style="word-break:break-all; font-family: monospace; font-size: 0.85rem;">${escapeHtml(f.payload)}</div>
+                                             <div class="mt-2">
+                                                 <button class="btn btn-outline-info btn-sm btn-analyze" 
+                                                         data-title="${escapeHtml(f.title)}" 
+                                                         data-type="${escapeHtml(f.type)}">
+                                                     Analyze Vulnerability
+                                                 </button>
+                                             </div>`;
+                                }
+                                html += `</div>`;
+                            });
                         }
                         html += `</div>`;
                     });
                 }
 
                 sheetContent.innerHTML = html;
+                
+                // **สำคัญ:** เพิ่ม Event Listener ให้กับปุ่ม Analyze ที่สร้างขึ้นใหม่
+                sheetContent.querySelectorAll('.btn-analyze').forEach(button => {
+                    button.addEventListener('click', (event) => {
+                        const btn = event.currentTarget;
+                        analyzePayload(btn.dataset.title, btn.dataset.type);
+                    });
+                });
             }
 
             if (tab === 'sheet') {
@@ -370,12 +309,8 @@
             };
         }
 
-        function escapeHtml(s) {
-            if (!s && s !== 0) return '';
-            return String(s).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c]));
-        }
-
         $('scanBtn').addEventListener('click', async () => {
+            // ... โค้ดส่วนที่เหลือเหมือนเดิมทั้งหมด ...
             abortRequested = false;
             const startUrl = $('startUrl').value.trim();
             if (!startUrl) {
@@ -396,7 +331,6 @@
             let cleaned_urls = [];
             try {
                 log('Calling /api/crawler/scan ...');
-                // ✅ ใช้ fetchWithAuth
                 const res = await fetchWithAuth('/api/crawler/scan', {
                     method: 'POST',
                     body: JSON.stringify({ url: startUrl })
@@ -453,7 +387,6 @@
                         log(`Starting #${idx + 1} ${url}`);
 
                         const payload = { cleaned_urls: [url], maxConcurrency: 1, createPdf: false };
-                        // ✅ ใช้ fetchWithAuth
                         const resp = await fetchWithAuth('/api/run-sqlmap-urls', {
                             method: 'POST',
                             body: JSON.stringify(payload)
@@ -508,7 +441,6 @@
             log('Generating PDF');
 
             try {
-                // ✅ ใช้ fetchWithAuth สำหรับการเรียกครั้งสุดท้ายเพื่อสร้าง PDF
                 const finalResp = await fetchWithAuth('/api/run-sqlmap-urls', {
                     method: 'POST',
                     body: JSON.stringify({ cleaned_urls, maxConcurrency: 2, createPdf: true })
@@ -516,8 +448,6 @@
 
                 if (finalResp.ok) {
                     const finalData = await finalResp.json();
-
-                    // ✅ FIX: สร้าง URL จาก processId ที่ได้รับมาใหม่
                     if (finalData.reportPdf && finalData.processId) {
                         const downloadUrl = `/api/processes/${finalData.processId}/pdf`;
                         $('downloadPdfBtn').href = downloadUrl;
@@ -527,7 +457,6 @@
                         log('PDF generation complete, but no download link returned.');
                     }
                 } else {
-                    // ถ้า request ไม่สำเร็จ
                     log('PDF generation request failed.');
                 }
             } catch (err) {
@@ -545,5 +474,4 @@
         });
     </script>
 </body>
-
 </html>

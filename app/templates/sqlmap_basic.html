@@ -30,6 +30,21 @@
         .icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; line-height: 0; color: #374151; }
         .icon-btn:hover { color: #000; }
         .url-detail hr { margin: 0.5rem 0; border-color: #e6edf0; }
+
+            /* **ปรับปรุง:** เพิ่มสไตล์สำหรับ Code Block ที่แปลงมาจาก Markdown */
+        #aiResult pre {
+            background-color: #f1f5f9;
+            padding: 1rem;
+            border-radius: 6px;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            border: 1px solid #e2e8f0;
+        }
+        #aiResult code {
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 0.9rem;
+            color: #1e293b;
+        }
     </style>
 </head>
 
@@ -110,17 +125,17 @@
     </div>
 
     <div class="modal fade" id="aiModal" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg modal-dialog-scrollable">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h5 class="modal-title">AI Payload Analysis</h5>
+                    <h5 class="modal-title">AI Vulnerability Analysis</h5>
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <h6>Payload:</h6>
-                    <pre id="aiPayload" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px;"></pre>
+                    <h6>Vulnerability Info:</h6>
+                    <div id="aiPayload" class="p-2 border rounded bg-light"></div>
                     <hr>
-                    <h6>Analysis:</h6>
+                    <h6>Remediation Steps:</h6>
                     <div id="aiResult" class="small-muted">Loading...</div>
                 </div>
                 <div class="modal-footer">
@@ -131,7 +146,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
-
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
         if (!checkAuth()) {
             // checkAuth() will redirect to /login automatically
@@ -205,24 +220,32 @@
             actions.appendChild(sheetBtn);
         }
         
-        async function analyzePayload(payload) {
+        // **ปรับปรุง:** ฟังก์ชันนี้ถูกแก้ไขทั้งหมด
+        async function analyzePayload(title, type) {
             const modalEl = document.getElementById('aiModal');
             const aiModal = bootstrap.Modal.getOrCreateInstance(modalEl);
             const payloadEl = document.getElementById('aiPayload');
             const resultEl = document.getElementById('aiResult');
 
-            payloadEl.textContent = payload;
+            // แสดง title และ type ใน modal แทน payload ดิบ
+            payloadEl.innerHTML = `<pre style="white-space:pre-wrap; font-size: 0.9rem;"><strong>Title:</strong> ${escapeHtml(title)}\n<strong>Type:</strong> ${escapeHtml(type)}</pre>`;
             resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
             aiModal.show();
-
+            
             try {
+                // สร้าง body สำหรับส่งไป API ตามที่เราออกแบบใหม่
+                const body = { title, type };
+                
                 const res = await fetchWithAuth('/api/llm/analyze-payload', {
                     method: 'POST',
-                    body: JSON.stringify({ payload })
+                    body: JSON.stringify(body) // ส่ง title และ type
                 });
+                
                 const data = await res.json();
+
                 if (res.ok && data.ok) {
-                    resultEl.innerHTML = `<pre style="white-space: pre-wrap; font-size: 0.9rem;">${escapeHtml(data.analysis)}</pre>`;
+                    // **ปรับปรุง:** ใช้ marked.parse() เพื่อแปลง Markdown เป็น HTML
+                    resultEl.innerHTML = marked.parse(data.analysis);
                 } else {
                     resultEl.textContent = 'Error: ' + (data.error || 'Failed to get analysis.');
                 }
@@ -232,7 +255,6 @@
             }
         }
 
-        // ✅ FIX: The entire function is updated for a more robust event handling
         function showViewerModal(idx, tab = 'raw') {
             const foundObj = resultsCollector.find(x => x.index === idx);
             const modalEl = document.getElementById('viewerModal');
@@ -276,13 +298,15 @@
                                             <div class="fw-semibold small-muted">${escapeHtml(f.type || 'N/A')} — ${escapeHtml(f.title || 'N/A')}</div>`;
                                 
                                 if (f.payload) {
-                                    // 1. Use a button tag and store payload in a data attribute
+                                    // **ปรับปรุง:** เพิ่ม data-title และ data-type เข้าไปในปุ่ม
                                     html += `<div class="mt-1" style="word-break:break-all; font-family: monospace; font-size: 0.85rem;">${escapeHtml(f.payload)}</div>
                                              <div class="mt-2">
-                                                <button class="btn btn-outline-info btn-sm btn-analyze" data-payload="${escapeHtml(f.payload)}">
-                                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-robot" viewBox="0 0 16 16"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062Zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a24.767 24.767 0 0 1-1.871-.183.25.25 0 0 0-.068.217l.92.9a.25.25 0 0 0 .393.04l.433-.43a.25.25 0 0 0-.04-.393l-.92-.9a.25.25 0 0 0-.217-.068Zm-2.512.654a.25.25 0 0 0-.346.346l.92.9a.25.25 0 0 0 .346.033l.434-.43a.25.25 0 0 0-.033-.346l-.92-.9a.25.25 0 0 0-.102-.07ZM11.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z"/><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1Zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5ZM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5Z"/></svg>
-                                                    Analyze Payload
-                                                </button>
+                                                 <button class="btn btn-outline-info btn-sm btn-analyze" 
+                                                         data-title="${escapeHtml(f.title)}" 
+                                                         data-type="${escapeHtml(f.type)}">
+                                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" fill="currentColor" class="bi bi-robot" viewBox="0 0 16 16"><path d="M6 12.5a.5.5 0 0 1 .5-.5h3a.5.5 0 0 1 0 1h-3a.5.5 0 0 1-.5-.5ZM3 8.062C3 6.76 4.235 5.765 5.53 5.886a26.58 26.58 0 0 0 4.94 0C11.765 5.765 13 6.76 13 8.062v1.157a.933.933 0 0 1-.765.935c-.845.147-2.34.346-4.235.346-1.895 0-3.39-.2-4.235-.346A.933.933 0 0 1 3 9.219V8.062Zm4.542-.827a.25.25 0 0 0-.217.068l-.92.9a24.767 24.767 0 0 1-1.871-.183.25.25 0 0 0-.068.217l.92.9a.25.25 0 0 0 .393.04l.433-.43a.25.25 0 0 0-.04-.393l-.92-.9a.25.25 0 0 0-.217-.068Zm-2.512.654a.25.25 0 0 0-.346.346l.92.9a.25.25 0 0 0 .346.033l.434-.43a.25.25 0 0 0-.033-.346l-.92-.9a.25.25 0 0 0-.102-.07ZM11.5 8a.5.5 0 1 0 0-1 .5.5 0 0 0 0 1Z"/><path d="M8 1a2.5 2.5 0 0 1 2.5 2.5V4h-5v-.5A2.5 2.5 0 0 1 8 1Zm3.5 3v-.5a3.5 3.5 0 1 0-7 0V4H1v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V4h-3.5ZM2 5h12v9a1 1 0 0 1-1 1H3a1 1 0 0 1-1-1V5Z"/></svg>
+                                                     Analyze Vulnerability
+                                                 </button>
                                              </div>`;
                                 }
                                 html += `</div>`;
@@ -293,14 +317,17 @@
                 }
                 sheetContent.innerHTML = html;
 
-                // 2. Add event listeners to all new buttons after they are added to the page
+                // **ปรับปรุง:** เพิ่ม Event Listener ให้ดึง title และ type แล้วส่งไปให้ analyzePayload
                 sheetContent.querySelectorAll('.btn-analyze').forEach(button => {
                     button.addEventListener('click', (event) => {
-                        const payload = event.currentTarget.dataset.payload;
-                        analyzePayload(payload);
+                        const btn = event.currentTarget;
+                        const title = btn.dataset.title;
+                        const type = btn.dataset.type;
+                        analyzePayload(title, type); // ส่ง title และ type แทน payload
                     });
                 });
             }
+            
 
             const rawTabBtn = document.querySelector('#raw-tab');
             const sheetTabBtn = document.querySelector('#sheet-tab');
