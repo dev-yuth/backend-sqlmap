@@ -1,125 +1,241 @@
-<!-- app/temaplates/login.html -->
-<!doctype html>
+
 <html lang="en">
-
 <head>
-  <meta charset="utf-8">
-  <title>Login</title>
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-  <script>
-    // ✅ FIX: สร้างฟังก์ชันสำหรับตรวจสอบและ refresh session เมื่อหน้าเว็บโหลด
-    (async () => {
-      const refresh_csrf = localStorage.getItem('refresh_csrf');
-
-      // ถ้ามี refresh token ใน localStorage ให้ลอง refresh session
-      if (refresh_csrf) {
-        try {
-          const res = await fetch('/api/auth/refresh', {
-            method: 'POST',
-            credentials: 'include', // สำคัญมาก! เพื่อให้ browser ส่ง cookie ไปด้วย
-            headers: {
-              'Content-Type': 'application/json',
-              'Accept': 'application/json',
-              // ✅ สำคัญ! ต้องส่ง X-CSRF-TOKEN ไปกับ header สำหรับการป้องกัน CSRF
-              'X-CSRF-TOKEN': refresh_csrf
-            }
-          });
-
-          // ถ้าสำเร็จ: session ยังใช้ได้
-          if (res.ok) {
-            const data = await res.json();
-            // อัปเดต access_csrf ตัวใหม่
-            localStorage.setItem('access_csrf', data.access_csrf);
-            // Redirect ไป dashboard
-            window.location.href = '/dashboard';
-          } else {
-            // ถ้าไม่สำเร็จ: session หมดอายุ หรือ token ไม่ถูกต้อง
-            console.warn('Session refresh failed. Clearing stale tokens.');
-            // ล้างข้อมูลเก่าทั้งหมดทิ้ง
-            localStorage.removeItem('access_csrf');
-            localStorage.removeItem('refresh_csrf');
-            localStorage.removeItem('user_id');
-            localStorage.removeItem('username');
-            localStorage.removeItem('is_admin');
-          }
-        } catch (err) {
-          console.error('Error during session refresh check:', err);
-          // หากเกิด error เช่น network error ก็ให้ล้าง token ทิ้งเช่นกัน
-          localStorage.clear(); 
+    <meta charset="utf-8">
+    <title>Login - SQLMap Scanner</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <style>
+        html, body {
+            height: 100%;
         }
-      }
-    })();
-  </script>
+
+        body {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f0f2f5;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 420px;
+            padding: 2rem;
+            border-radius: 1rem;
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37);
+            border: 1px solid rgba(255, 255, 255, 0.18);
+        }
+
+        .login-header {
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+        
+        .login-header .icon {
+            font-size: 3rem;
+            color: #0d6efd;
+        }
+
+        .password-toggle-container {
+            position: relative;
+        }
+
+        .password-toggle-container .form-control {
+            padding-right: 3rem;
+        }
+
+        .password-toggle-checkbox {
+            position: absolute;
+            top: 50%;
+            right: 0.75rem;
+            transform: translateY(-50%);
+            z-index: 5;
+            cursor: pointer;
+            width: 1.5rem;
+            height: 1.5rem;
+            opacity: 0;
+        }
+
+        .password-toggle-icon {
+            position: absolute;
+            top: 50%;
+            right: 0.75rem;
+            transform: translateY(-50%);
+            pointer-events: none;
+            color: #6c757d;
+        }
+
+        .password-toggle-checkbox:checked ~ .password-toggle-icon-show {
+            display: none;
+        }
+
+        .password-toggle-checkbox:not(:checked) ~ .password-toggle-icon-hide {
+            display: none;
+        }
+    </style>
 </head>
+<body>
 
-<body class="bg-light">
-  <div class="container mt-5">
-    <div class="row justify-content-center">
-      <div class="col-md-4">
-        <div class="card p-4">
-          <h4 class="mb-3 text-center">Login</h4>
-          <form id="loginForm">
-            <div class="mb-3">
-              <input type="text" class="form-control" placeholder="Username or Email" id="username" required>
+    <div class="card login-card bg-light">
+        <div class="card-body">
+            <div class="login-header">
+                <svg xmlns="http://www.w3.org/2000/svg" width="3rem" height="3rem" fill="currentColor" class="bi bi-shield-lock-fill" viewBox="0 0 16 16">
+                    <path fill-rule="evenodd" d="M8 0c-.81 0-1.44.31-1.843.714C5.748 1.13 5.146 1.757 4.7 2.515c-.446.757-1.01 2.01-1.01 3.485V8.5c0 1.582.48 2.846 1.05 3.758.57.912 1.32 1.506 2.043 1.954.123.074.255.14.393.197.135.056.28.094.43.114.155.02.315.029.48.029s.325-.01.48-.03c.15-.02.295-.058.43-.114.138-.057.27-.123.393-.197.723-.448 1.473-1.042 2.043-1.954.57-.912 1.05-2.176 1.05-3.758V5.999c0-1.474-.565-2.728-1.01-3.484-.446-.758-1.048-1.386-1.45-1.798C9.44 0.31 8.81 0 8 0M7 8.025A1.5 1.5 0 1 1 5.5 9.5 1.5 1.5 0 0 1 7 8.025m3.5 0a.5.5 0 0 1-1 0V6.5a.5.5 0 0 1 1 0z"/>
+                </svg>
+                <h3 class="mt-3">SQLMap Scanner</h3>
+                <p class="text-muted">Please sign in to continue</p>
             </div>
-            <div class="mb-3">
-              <input type="password" class="form-control" placeholder="Password" id="password" required>
-            </div>
-            <button type="submit" class="btn btn-primary w-100">Login</button>
-          </form>
-          <div id="msg" class="mt-2 text-danger"></div>
+            
+            <form id="loginForm">
+                <div class="mb-3">
+                    <label for="username" class="form-label">Username</label>
+                    <input type="text" class="form-control form-control-lg" id="username" placeholder="Enter your username" required>
+                </div>
+
+                <div class="mb-4">
+                    <label for="password" class="form-label">Password</label>
+                    <div class="password-toggle-container">
+                        <input type="password" class="form-control form-control-lg" id="password" placeholder="Enter your password" required>
+                        <input type="checkbox" class="password-toggle-checkbox" id="togglePassword">
+                        <i class="bi bi-eye-slash-fill password-toggle-icon password-toggle-icon-show"></i>
+                        <i class="bi bi-eye-fill password-toggle-icon password-toggle-icon-hide"></i>
+                    </div>
+                </div>
+
+                <div class="d-grid">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                        Sign In
+                    </button>
+                </div>
+            </form>
         </div>
-      </div>
     </div>
-  </div>
+    
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        // ตรวจสอบ session ก่อนแสดงหน้า login
+        (async () => {
+            const refresh_csrf = localStorage.getItem('refresh_csrf');
+            if (refresh_csrf) {
+                try {
+                    const res = await fetch('/api/auth/refresh', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json',
+                            'X-CSRF-TOKEN': refresh_csrf
+                        }
+                    });
+                    if (res.ok) {
+                        const data = await res.json();
+                        localStorage.setItem('access_csrf', data.access_csrf);
+                        window.location.href = '/dashboard';
+                    } else {
+                        localStorage.clear();
+                    }
+                } catch (err) {
+                    console.error("Auto-refresh failed:", err);
+                    localStorage.clear();
+                }
+            }
+        })();
 
-  <script>
-    // โค้ดส่วนจัดการฟอร์ม login ยังคงเหมือนเดิม ไม่ต้องแก้ไข
-    const form = document.getElementById('loginForm');
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginForm = document.getElementById('loginForm');
+            const togglePassword = document.getElementById('togglePassword');
+            const passwordInput = document.getElementById('password');
+            const submitButton = loginForm.querySelector('button[type="submit"]');
+            const spinner = submitButton.querySelector('.spinner-border');
 
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      const username = document.getElementById('username').value.trim();
-      const password = document.getElementById('password').value.trim();
+            // สร้าง Toast mixin สำหรับการแจ้งเตือน
+            const Toast = Swal.mixin({
+                toast: true,
+                position: 'top-end',
+                showConfirmButton: false,
+                timer: 3500,
+                timerProgressBar: true,
+                didOpen: (toast) => {
+                    toast.addEventListener('mouseenter', Swal.stopTimer);
+                    toast.addEventListener('mouseleave', Swal.resumeTimer);
+                }
+            });
 
-      if (!username || !password) {
-        document.getElementById('msg').innerText = "Username and password required";
-        return;
-      }
+            // Event listener สำหรับแสดง/ซ่อนรหัสผ่าน
+            togglePassword.addEventListener('change', () => {
+                const type = passwordInput.getAttribute('type') === 'password' ? 'text' : 'password';
+                passwordInput.setAttribute('type', type);
+            });
+            
+            // Event listener สำหรับฟอร์ม login
+            loginForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
 
-      try {
-        const body = JSON.stringify({ username, password });
-        const res = await fetch('/api/auth/login', {
-          method: 'POST',
-          credentials: 'include',
-          headers: {
-            'Content-Type': 'application/json',
-            'Accept': 'application/json'
-          },
-          body
+                const username = document.getElementById('username').value.trim();
+                const password = passwordInput.value.trim();
+
+                if (!username || !password) {
+                    Toast.fire({ icon: 'warning', title: 'กรุณากรอกชื่อผู้ใช้และรหัสผ่าน' });
+                    return;
+                }
+                
+                spinner.classList.remove('d-none');
+                submitButton.disabled = true;
+
+                try {
+                    const body = JSON.stringify({ username, password });
+                    const res = await fetch('/api/auth/login', {
+                        method: 'POST',
+                        credentials: 'include',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/json'
+                        },
+                        body
+                    });
+                    
+                    // ✅ [แก้ไข] ตรวจสอบสถานะ (res.ok) ก่อนอ่าน JSON
+                    if (!res.ok) {
+                        let errorMsg = 'An unknown error occurred.';
+                        try {
+                            // พยายามอ่านข้อความ error จาก JSON ที่เซิร์ฟเวอร์ส่งมา
+                            const errorData = await res.json();
+                            errorMsg = errorData.msg || `Server responded with status: ${res.status}`;
+                        } catch (jsonError) {
+                            // หากเซิร์ฟเวอร์ส่งข้อความที่ไม่ใช่ JSON (เช่น HTML error)
+                            errorMsg = res.statusText || `Server error: ${res.status}`;
+                        }
+                        // ส่งต่อไปยัง catch block ด้านล่าง
+                        throw new Error(errorMsg);
+                    }
+                    
+                    // หาก res.ok เป็นจริง จึงทำการอ่าน JSON
+                    const data = await res.json();
+
+                    localStorage.setItem('access_csrf', data.access_csrf);
+                    localStorage.setItem('refresh_csrf', data.refresh_csrf);
+                    localStorage.setItem('user_id', data.user.id);
+                    localStorage.setItem('username', data.user.username);
+                    localStorage.setItem('is_admin', data.user.is_admin);
+                    
+                    Toast.fire({ icon: 'success', title: 'ลงชื่อเข้าใช้สำเร็จ!' });
+                    
+                    setTimeout(() => {
+                        window.location.href = '/dashboard';
+                    }, 1000);
+
+                } catch (err) {
+                    console.error("Login error:", err);
+                    // ✅ แสดงข้อความ error ที่แม่นยำขึ้น
+                    Toast.fire({ icon: 'error', title: err.message });
+                } finally {
+                    spinner.classList.add('d-none');
+                    submitButton.disabled = false;
+                }
+            });
         });
-
-        const data = await res.json();
-
-        if (res.ok) {
-          // ✅ เก็บ CSRF token สำหรับ request ต่อไป
-          localStorage.setItem('access_csrf', data.access_csrf);
-          localStorage.setItem('refresh_csrf', data.refresh_csrf);
-          localStorage.setItem('user_id', data.user.id);
-          localStorage.setItem('username', data.user.username);
-          localStorage.setItem('is_admin', data.user.is_admin);
-
-          // redirect ไป dashboard
-          window.location.href = '/dashboard';
-        } else {
-          document.getElementById('msg').innerText = data.msg || "Login failed";
-        }
-      } catch (err) {
-        console.error("Login error:", err);
-        document.getElementById('msg').innerText = "An error occurred. Check console for details";
-      }
-    });
-  </script>
+    </script>
 </body>
-
 </html>

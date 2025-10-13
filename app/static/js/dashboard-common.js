@@ -49,8 +49,8 @@ const DashboardCommon = {
         const navLinks = document.getElementById("nav-links");
         navLinks.innerHTML = `
             <li class="nav-item"><a class="nav-link active" href="#">Dashboard</a></li>
-            ${isAdmin ? `<li class="nav-item"><a class="nav-link" href="/sqlmap_urls">SQLMap URLs</a></li>` : ""}
-            <li class="nav-item"><a class="nav-link" href="/sqlmap_basic">SQLMap Basic Scanner</a></li>
+            ${isAdmin ? `<li class="nav-item"><a class="nav-link" href="/sqlmap-urls">SQLMap URLs</a></li>` : ""}
+            <li class="nav-item"><a class="nav-link" href="/sqlmap-basic">SQLMap Basic Scanner</a></li>
         `;
     },
 

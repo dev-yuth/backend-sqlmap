@@ -26,12 +26,10 @@ def login():
         print("Error parsing JSON:", e)
         return {"msg": "Invalid JSON"}, 400
 
-    print("REQUEST JSON:", data)
-
     identifier = data.get("username") or data.get("email")
     password = data.get("password")
     if not identifier or not password:
-        return {"msg": "missing credentials"}, 400
+        return {"msg": "Username and password are required"}, 400
 
     user = User.query.filter(
         (User.username == identifier) | (User.email == identifier)
@@ -40,9 +38,17 @@ def login():
     ip = request.remote_addr
     ua = request.headers.get("User-Agent", "")
 
-    if not user or not user.check_password(password):
+    # ✅ [แก้ไข] แยกการตรวจสอบเพื่อแก้ปัญหา 'user_id' cannot be null
+    # 1. ตรวจสอบว่ามีผู้ใช้หรือไม่
+    if not user:
+        # ไม่ต้องบันทึก log หาก user ไม่มีอยู่จริง เพื่อหลีกเลี่ยง IntegrityError
+        return {"msg": "Invalid username or password."}, 401
+
+    # 2. หากมีผู้ใช้ ให้ตรวจสอบรหัสผ่าน
+    if not user.check_password(password):
+        # ณ จุดนี้ เรามั่นใจว่า 'user' object มีอยู่จริงและมี user.id
         log = LoginLog(
-            user_id=user.id if user else None,
+            user_id=user.id,
             username=identifier,
             ip_address=ip,
             user_agent=ua,
@@ -50,9 +56,22 @@ def login():
         )
         db.session.add(log)
         db.session.commit()
-        return {"msg": "invalid credentials"}, 401
+        return {"msg": "Invalid username or password."}, 401
 
-    # ✅ แก้ไข: แปลง user.id เป็น string
+    # 3. หากรหัสผ่านถูกต้อง ให้ตรวจสอบสถานะ is_active
+    if not user.is_active:
+        log = LoginLog(
+            user_id=user.id,
+            username=user.username,
+            ip_address=ip,
+            user_agent=ua,
+            success=False, 
+        )
+        db.session.add(log)
+        db.session.commit()
+        return {"msg": "Your account has been disabled. Please contact an administrator."}, 403
+
+    # หากทุกอย่างถูกต้อง จึงสร้าง Token
     access = create_access_token(
         identity=str(user.id), 
         additional_claims={"is_admin": user.is_admin}
@@ -62,7 +81,7 @@ def login():
         additional_claims={"is_admin": user.is_admin}
     )
 
-    # log success
+    # บันทึกการล็อกอินสำเร็จ
     log = LoginLog(
         user_id=user.id,
         username=user.username,
@@ -89,13 +108,12 @@ def login():
 @jwt_required(refresh=True, locations=["cookies"])
 def refresh():
     identity = get_jwt_identity()
-    # ✅ แปลง identity กลับเป็น int เมื่อใช้ query
     user = User.query.get(int(identity))
     if not user or not user.is_active:
         return {"msg": "User not found or inactive"}, 404
 
     access = create_access_token(
-        identity=identity,  # identity นี้เป็น string อยู่แล้ว
+        identity=identity,
         additional_claims={"is_admin": user.is_admin}
     )
     resp = make_response({

@@ -1,4 +1,6 @@
 # app/routes/user.py
+import string
+import secrets
 from flask import Blueprint, jsonify, request
 from app.models.user import User
 from app.extensions import db
@@ -12,10 +14,9 @@ bp = Blueprint("user", __name__, url_prefix="/api/user")
 # คืนข้อมูลผู้ใช้ปัจจุบัน (ต้องมี access token จาก cookies)
 # ------------------------------
 @bp.route("/me", methods=["GET"])
-@jwt_required(locations=["cookies"])  # ✅ เพิ่ม locations=["cookies"]
+@jwt_required(locations=["cookies"])
 def me():
     user_id = get_jwt_identity()
-    # ✅ แปลง string เป็น int เพราะ identity ถูกเก็บเป็น string
     user = User.query.get(int(user_id))
 
     if not user or not user.is_active:
@@ -28,10 +29,9 @@ def me():
 # คืนรายชื่อผู้ใช้ทั้งหมด — จำกัดเฉพาะ admin
 # ------------------------------
 @bp.route("/all", methods=["GET"])
-@jwt_required(locations=["cookies"])  # ✅ เพิ่ม locations=["cookies"]
+@jwt_required(locations=["cookies"])
 def all_users():
     user_id = get_jwt_identity()
-    # ✅ แปลง string เป็น int
     user = User.query.get(int(user_id))
 
     if not user or not user.is_admin:
@@ -40,20 +40,26 @@ def all_users():
     users = User.query.all()
     return {"users": [u.to_dict() for u in users]}
 
-# --- ✅ โค้ดที่เพิ่มเข้ามาสำหรับจัดการผู้ใช้ ---
 
+# ------------------------------
+# GET /api/user/users
+# คืนรายชื่อผู้ใช้ทั้งหมด (เฉพาะ role user, ไม่รวม admin) — จำกัดเฉพาะ admin
+# ------------------------------
 @bp.route("/users", methods=["GET"])
 @jwt_required()
 @admin_required
 def get_all_users():
-    """Admin-only endpoint to get all users."""
+    """Admin-only endpoint to get all non-admin users."""
     try:
-        users = User.query.order_by(User.id).all()
-        return jsonify([user.to_dict_admin() for user in users]), 200
+        users = User.query.filter_by(is_admin=False).order_by(User.id).all()
+        return jsonify([user.to_dict() for user in users]), 200
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-# 💡 **เพิ่ม: Endpoint สำหรับสร้าง User ใหม่ (Admin only)**
+# ------------------------------
+# POST /api/user/users
+# Endpoint สำหรับสร้าง User ใหม่ (Admin only)
+# ------------------------------
 @bp.route("/users", methods=["POST"])
 @jwt_required()
 @admin_required
@@ -63,8 +69,8 @@ def create_user():
     username = data.get("username")
     email = data.get("email")
     password = data.get("password")
-    # Admin สามารถกำหนดสิทธิ์ is_admin ได้
-    is_admin = data.get("is_admin", False) 
+    
+    is_admin = False 
 
     if not username or not password:
         return jsonify({"error": "Username and password are required"}), 400
@@ -81,8 +87,11 @@ def create_user():
     db.session.add(new_user)
     db.session.commit()
     
-    return jsonify(new_user.to_dict_admin()), 201
-# 💡 **เพิ่ม: Endpoint สำหรับอัปเดตรหัสผ่าน (Admin only)**
+    return jsonify(new_user.to_dict()), 201
+
+# ------------------------------
+# ✨ [แก้ไข] Endpoint สำหรับ *ตั้งค่า* รหัสผ่านใหม่ (Admin only)
+# ------------------------------
 @bp.route("/users/<int:user_id>/password", methods=["PUT"])
 @jwt_required()
 @admin_required
@@ -91,8 +100,8 @@ def update_user_password(user_id):
     data = request.get_json()
     password = data.get('password')
 
-    if not password or len(password) < 4: # เพิ่มเงื่อนไขความยาวรหัสผ่าน
-        return jsonify({"error": "Password is required and must be at least 4 characters."}), 400
+    if not password or len(password) < 6:
+        return jsonify({"error": "Password is required and must be at least 6 characters."}), 400
 
     user = User.query.get(user_id)
     if not user:
@@ -103,8 +112,10 @@ def update_user_password(user_id):
     
     return jsonify({"message": f"Password for user {user.username} updated successfully."}), 200
 
-
-
+# ------------------------------
+# PUT /api/user/users/<int:user_id>/status
+# Endpoint สำหรับอัปเดตสถานะ is_active (Admin only)
+# ------------------------------
 @bp.route("/users/<int:user_id>/status", methods=["PUT"])
 @jwt_required()
 @admin_required
@@ -120,7 +131,6 @@ def update_user_status(user_id):
     if not user:
         return jsonify({"error": "User not found"}), 404
     
-    # ป้องกันไม่ให้ admin ปิดการใช้งานบัญชีของตัวเอง
     current_admin_id = get_jwt_identity()
     if str(user.id) == str(current_admin_id):
         return jsonify({"error": "Admin cannot deactivate their own account."}), 403
@@ -128,7 +138,7 @@ def update_user_status(user_id):
     try:
         user.is_active = is_active
         db.session.commit()
-        return jsonify(user.to_dict_admin()), 200
+        return jsonify(user.to_dict()), 200
     except Exception as e:
         db.session.rollback()
         return jsonify({"error": str(e)}), 500
