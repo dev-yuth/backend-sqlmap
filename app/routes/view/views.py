@@ -31,7 +31,7 @@ def index():
 def admin_dashboard():
     return render_template("admin_dashboard.html")
 
-@bp.route("/sqlmap_urls")
+@bp.route("/sqlmap-urls")
 @jwt_required(locations=["cookies"])
 @admin_required
 def sqlmap_urls():
@@ -42,7 +42,15 @@ def sqlmap_urls():
 def user_dashboard():
     return render_template("user_dashboard.html")
 
-@bp.route("/sqlmap_basic")
+@bp.route("/sqlmap-basic")
 @jwt_required(locations=["cookies"])
 def sqlmap_basic():
     return render_template("sqlmap_basic.html")
+
+@bp.route("/admin/users")
+@jwt_required(locations=["cookies"])
+@admin_required
+def admin_users_page():
+    """Renders the user management page for admins."""
+    return render_template("admin_user_management.html")
+

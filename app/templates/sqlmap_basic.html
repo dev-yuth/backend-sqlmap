@@ -8,30 +8,160 @@
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         /* CSS styles remain unchanged */
-        .steps { display: flex; gap: 1rem; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; }
-        .step { display: flex; flex-direction: column; align-items: center; width: 12rem; text-align: center; }
-        .step-circle { width: 48px; height: 48px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; background: #d1d5db; transition: background .25s ease, transform .15s ease; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06); }
-        .step-label { font-size: 0.95rem; margin-top: 0.5rem; color: #374151; }
-        .step.active .step-circle { background: linear-gradient(90deg, #0ea5a4, #06b6d4); transform: translateY(-4px); }
-        .step.done .step-circle { background: linear-gradient(90deg, #10b981, #34d399); }
-        .progress-wrap { width: 100%; background: #e6edf0; border-radius: 999px; overflow: hidden; height: 18px; margin-bottom: 0.75rem; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04); }
-        .progress-fill { width: 0%; height: 100%; background: linear-gradient(90deg, #6366f1, #8b5cf6); transition: width .35s ease; display: flex; align-items: center; justify-content: center; color: white; font-weight: 600; font-size: 0.85rem; }
-        .url-list { max-height: 400px; overflow: auto; border: 1px solid #e6edf0; padding: 0.5rem; border-radius: 6px; background: #fff; }
-        .url-item { display: flex; gap: 0.75rem; align-items: center; padding: 0.35rem 0.25rem; border-bottom: 1px dashed #f1f5f9; }
-        .url-item:last-child { border-bottom: none; }
-        .url-status { min-width: 95px; text-align: center; font-weight: 600; font-size: 0.85rem; padding: 4px 8px; border-radius: 6px; color: #fff; }
-        .status-pending { background: #9ca3af; }
-        .status-running { background: #06b6d4; }
-        .status-ok { background: #10b981; }
-        .status-fail { background: #ef4444; }
-        .small-muted { font-size: 0.85rem; color: #6b7280; }
-        .item-card { background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 1rem; margin-bottom: 1rem; }
-        .url-actions { display: flex; gap: 0.25rem; align-items: center; margin-left: 8px; }
-        .icon-btn { background: transparent; border: none; padding: 4px; cursor: pointer; line-height: 0; color: #374151; }
-        .icon-btn:hover { color: #000; }
-        .url-detail hr { margin: 0.5rem 0; border-color: #e6edf0; }
+        .steps {
+            display: flex;
+            gap: 1rem;
+            align-items: center;
+            margin-bottom: 1rem;
+            flex-wrap: wrap;
+        }
 
-            /* **ปรับปรุง:** เพิ่มสไตล์สำหรับ Code Block ที่แปลงมาจาก Markdown */
+        .step {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 12rem;
+            text-align: center;
+        }
+
+        .step-circle {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #fff;
+            background: #d1d5db;
+            transition: background .25s ease, transform .15s ease;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+        }
+
+        .step-label {
+            font-size: 0.95rem;
+            margin-top: 0.5rem;
+            color: #374151;
+        }
+
+        .step.active .step-circle {
+            background: linear-gradient(90deg, #0ea5a4, #06b6d4);
+            transform: translateY(-4px);
+        }
+
+        .step.done .step-circle {
+            background: linear-gradient(90deg, #10b981, #34d399);
+        }
+
+        .progress-wrap {
+            width: 100%;
+            background: #e6edf0;
+            border-radius: 999px;
+            overflow: hidden;
+            height: 18px;
+            margin-bottom: 0.75rem;
+            box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.04);
+        }
+
+        .progress-fill {
+            width: 0%;
+            height: 100%;
+            background: linear-gradient(90deg, #6366f1, #8b5cf6);
+            transition: width .35s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .url-list {
+            max-height: 400px;
+            overflow: auto;
+            border: 1px solid #e6edf0;
+            padding: 0.5rem;
+            border-radius: 6px;
+            background: #fff;
+        }
+
+        .url-item {
+            display: flex;
+            gap: 0.75rem;
+            align-items: center;
+            padding: 0.35rem 0.25rem;
+            border-bottom: 1px dashed #f1f5f9;
+        }
+
+        .url-item:last-child {
+            border-bottom: none;
+        }
+
+        .url-status {
+            min-width: 95px;
+            text-align: center;
+            font-weight: 600;
+            font-size: 0.85rem;
+            padding: 4px 8px;
+            border-radius: 6px;
+            color: #fff;
+        }
+
+        .status-pending {
+            background: #9ca3af;
+        }
+
+        .status-running {
+            background: #06b6d4;
+        }
+
+        .status-ok {
+            background: #10b981;
+        }
+
+        .status-fail {
+            background: #ef4444;
+        }
+
+        .small-muted {
+            font-size: 0.85rem;
+            color: #6b7280;
+        }
+
+        .item-card {
+            background: #f8f9fa;
+            border: 1px solid #dee2e6;
+            border-radius: 6px;
+            padding: 1rem;
+            margin-bottom: 1rem;
+        }
+
+        .url-actions {
+            display: flex;
+            gap: 0.25rem;
+            align-items: center;
+            margin-left: 8px;
+        }
+
+        .icon-btn {
+            background: transparent;
+            border: none;
+            padding: 4px;
+            cursor: pointer;
+            line-height: 0;
+            color: #374151;
+        }
+
+        .icon-btn:hover {
+            color: #000;
+        }
+
+        .url-detail hr {
+            margin: 0.5rem 0;
+            border-color: #e6edf0;
+        }
+
+        /* **ปรับปรุง:** เพิ่มสไตล์สำหรับ Code Block ที่แปลงมาจาก Markdown */
         #aiResult pre {
             background-color: #f1f5f9;
             padding: 1rem;
@@ -40,15 +170,52 @@
             word-wrap: break-word;
             border: 1px solid #e2e8f0;
         }
+
         #aiResult code {
             font-family: Consolas, 'Courier New', monospace;
             font-size: 0.9rem;
             color: #1e293b;
         }
     </style>
+    <style>
+        body {
+            padding-top: 70px;
+        }
+
+        /* ป้องกัน Navbar ทับเนื้อหา */
+        .badge-success {
+            background-color: #28a745;
+        }
+
+        .badge-danger {
+            background-color: #dc3545;
+        }
+
+        .table-section {
+            margin-bottom: 3rem;
+        }
+    </style>
 </head>
 
 <body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a id="navbar-brand-link" class="navbar-brand" href="#">
+                <i class="bi bi-shield-check"></i>
+                SQLMap Scanner <span id="admin-badge-container"></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul id="nav-links-placeholder" class="navbar-nav me-auto">
+                    </ul>
+                <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
     <div class="container py-4">
         <h4 class="mb-3">SQLMap Basic Scanner</h4>
 
@@ -57,17 +224,30 @@
                 <div class="d-flex gap-2 mb-3">
                     <button id="addItem" class="btn btn-secondary btn-sm">Add Item</button>
                     <button id="startScan" class="btn btn-primary">Start Scan</button>
-                    <a id="downloadPdf" class="btn btn-success btn-sm ms-auto d-none" target="_blank" style="font-size: medium;">ดาวน์โหลด PDF</a>
+                    <a id="downloadPdf" class="btn btn-success btn-sm ms-auto d-none" target="_blank"
+                        style="font-size: medium;">ดาวน์โหลด PDF</a>
                 </div>
                 <div id="itemsContainer"></div>
             </div>
         </div>
 
         <div class="steps mb-3">
-            <div class="step" id="step-1"><div class="step-circle">1</div><div class="step-label">Config</div></div>
-            <div class="step" id="step-2"><div class="step-circle">2</div><div class="step-label">Scan</div></div>
-            <div class="step" id="step-3"><div class="step-circle">3</div><div class="step-label">PDF</div></div>
-            <div class="step" id="step-4"><div class="step-circle">4</div><div class="step-label">Done</div></div>
+            <div class="step" id="step-1">
+                <div class="step-circle">1</div>
+                <div class="step-label">Config</div>
+            </div>
+            <div class="step" id="step-2">
+                <div class="step-circle">2</div>
+                <div class="step-label">Scan</div>
+            </div>
+            <div class="step" id="step-3">
+                <div class="step-circle">3</div>
+                <div class="step-label">PDF</div>
+            </div>
+            <div class="step" id="step-4">
+                <div class="step-circle">4</div>
+                <div class="step-label">Done</div>
+            </div>
         </div>
 
         <div class="progress-wrap mb-3">
@@ -85,7 +265,8 @@
             </div>
             <div class="mb-2">
                 <label class="form-label small">Data (JSON)</label>
-                <textarea data-data class="form-control form-control-sm" rows="2" placeholder='{"param":"value"}'></textarea>
+                <textarea data-data class="form-control form-control-sm" rows="2"
+                    placeholder='{"param":"value"}'></textarea>
             </div>
             <button class="btn btn-danger btn-sm" data-remove>Remove</button>
         </div>
@@ -101,15 +282,18 @@
                 <div class="modal-body">
                     <ul class="nav nav-tabs mb-3" id="viewerTabs" role="tablist">
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw" type="button" role="tab">Raw JSON</button>
+                            <button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw"
+                                type="button" role="tab">Raw JSON</button>
                         </li>
                         <li class="nav-item" role="presentation">
-                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet" type="button" role="tab">Sheet / Parsed</button>
+                            <button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet"
+                                type="button" role="tab">Sheet / Parsed</button>
                         </li>
                     </ul>
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="tab-raw" role="tabpanel">
-                            <pre id="rawJson" style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
+                            <pre id="rawJson"
+                                style="white-space:pre-wrap; background:#f8f9fa; padding:12px; border-radius:6px; max-height:60vh; overflow:auto;"></pre>
                         </div>
                         <div class="tab-pane fade" id="tab-sheet" role="tabpanel">
                             <div id="sheetContent"></div>
@@ -148,10 +332,43 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        if (!checkAuth()) {
-            // checkAuth() will redirect to /login automatically
-        }
+        document.addEventListener('DOMContentLoaded', function () {
+            // --- Navbar Rendering Logic ---
+            const isAdmin = localStorage.getItem('is_admin') === 'true';
+            const navLinksContainer = document.getElementById('nav-links-placeholder');
+            const navBrandLink = document.getElementById('navbar-brand-link');
+            const adminBadgeContainer = document.getElementById('admin-badge-container');
 
+            let navLinksHtml = '';
+
+            // Set Brand link and Admin Badge
+            if (isAdmin) {
+                navBrandLink.href = '/admin/dashboard';
+                adminBadgeContainer.innerHTML = '<span class="badge bg-danger">Admin</span>';
+            } else {
+                navBrandLink.href = '/user/dashboard';
+            }
+
+            // Common links
+            const dashboardLink = isAdmin ? '/admin/dashboard' : '/user/dashboard';
+            navLinksHtml += `<li class="nav-item"><a class="nav-link" href="${dashboardLink}"><i class="bi bi-grid-1x2 me-1"></i>Dashboard</a></li>`;
+            navLinksHtml += `<li class="nav-item"><a class="nav-link active" aria-current="page" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a></li>`;
+
+            // Admin-only link
+            if (isAdmin) {
+                navLinksHtml += `<li class="nav-item"><a class="nav-link" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a></li>`;
+            }
+
+            navLinksContainer.innerHTML = navLinksHtml;
+
+            // Logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+
+            // --- Original Page Logic ---
+            if (!checkAuth()) { /* Redirects if not logged in */ }
+            // ... (ใส่โค้ด JavaScript เดิมของหน้านี้ต่อจากตรงนี้)
+        });
+   
         const $ = id => document.getElementById(id);
         const setStep = (num, state) => { const el = $('step-' + num); if (!el) return; el.classList.remove('active', 'done'); if (state === 'active') el.classList.add('active'); if (state === 'done') el.classList.add('done'); };
         const setProgress = p => { const el = $('progressBar'); el.style.width = p + '%'; el.textContent = p + '%'; };
@@ -219,7 +436,7 @@
             sheetBtn.addEventListener('click', () => showViewerModal(idx, 'sheet'));
             actions.appendChild(sheetBtn);
         }
-        
+
         // **ปรับปรุง:** ฟังก์ชันนี้ถูกแก้ไขทั้งหมด
         async function analyzePayload(title, type) {
             const modalEl = document.getElementById('aiModal');
@@ -231,16 +448,16 @@
             payloadEl.innerHTML = `<pre style="white-space:pre-wrap; font-size: 0.9rem;"><strong>Title:</strong> ${escapeHtml(title)}\n<strong>Type:</strong> ${escapeHtml(type)}</pre>`;
             resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
             aiModal.show();
-            
+
             try {
                 // สร้าง body สำหรับส่งไป API ตามที่เราออกแบบใหม่
                 const body = { title, type };
-                
+
                 const res = await fetchWithAuth('/api/llm/analyze-payload', {
                     method: 'POST',
                     body: JSON.stringify(body) // ส่ง title และ type
                 });
-                
+
                 const data = await res.json();
 
                 if (res.ok && data.ok) {
@@ -270,7 +487,7 @@
             } else {
                 title.textContent = `Result for #${idx + 1}`;
                 rawJson.textContent = JSON.stringify(foundObj.result, null, 2);
-                
+
                 const r = foundObj.result;
                 let html = '';
 
@@ -291,12 +508,12 @@
                     html += `<hr><h6>Parameters</h6>`;
                     r.parametersRaw.forEach((p, pi) => {
                         html += `<div class="mb-2"><div class="fw-semibold">Parameter #${pi + 1}: ${escapeHtml(p.parameter ?? ('index ' + (p.index ?? pi)))}</div>`;
-                        
-                        if (p.findings) { 
+
+                        if (p.findings) {
                             p.findings.forEach(f => {
                                 html += `<div class="mb-1 p-2 border rounded">
                                             <div class="fw-semibold small-muted">${escapeHtml(f.type || 'N/A')} — ${escapeHtml(f.title || 'N/A')}</div>`;
-                                
+
                                 if (f.payload) {
                                     // **ปรับปรุง:** เพิ่ม data-title และ data-type เข้าไปในปุ่ม
                                     html += `<div class="mt-1" style="word-break:break-all; font-family: monospace; font-size: 0.85rem;">${escapeHtml(f.payload)}</div>
@@ -327,7 +544,7 @@
                     });
                 });
             }
-            
+
 
             const rawTabBtn = document.querySelector('#raw-tab');
             const sheetTabBtn = document.querySelector('#sheet-tab');
@@ -423,4 +640,5 @@
         setStep(1, 'active');
     </script>
 </body>
+
 </html>

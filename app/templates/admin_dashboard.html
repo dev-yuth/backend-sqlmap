@@ -29,19 +29,41 @@
             margin-bottom: 3rem;
         }
     </style>
+        <style>
+        body { padding-top: 70px; } /* ป้องกัน Navbar ทับเนื้อหา */
+        .badge-success { background-color: #28a745; }
+        .badge-danger { background-color: #dc3545; }
+        .table-section { margin-bottom: 3rem; }
+    </style>
 </head>
 
 <body class="bg-light">
     <!-- Navbar -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
         <div class="container-fluid">
-            <a class="navbar-brand" href="#">Admin Dashboard</a>
+            <a class="navbar-brand" href="/admin/dashboard">
+                <i class="bi bi-shield-check"></i>
+                SQLMap Scanner <span class="badge bg-danger">Admin</span>
+            </a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
                 <span class="navbar-toggler-icon"></span>
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
-                <ul class="navbar-nav me-auto mb-2 mb-lg-0" id="nav-links"></ul>
-                <button class="btn btn-outline-danger" id="logoutBtn">Logout</button>
+                <ul class="navbar-nav me-auto">
+                    <li class="nav-item">
+                        <a class="nav-link active" aria-current="page" href="/admin/dashboard">Dashboard</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/users">User Management</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/user/dashboard/sqlmap-basic">Basic Scanner</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/user/dashboard/sqlmap-urls">URLs Scanner</a>
+                    </li>
+                </ul>
+                <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
             </div>
         </div>
     </nav>
@@ -151,7 +173,7 @@
             }
 
             // สร้าง Navbar
-            DC.renderNavbar(true);
+            // DC.renderNavbar(true);
             // 💡 **แก้ไข:** เพิ่มฟังก์ชัน escapeHtml ที่ขาดหายไปเพื่อแก้ Error
             function escapeHtml(s) {
                 if (!s && s !== 0) return '';

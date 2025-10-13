@@ -38,13 +38,35 @@
             font-family: Consolas, 'Courier New', monospace; font-size: 0.9rem; color: #1e293b;
         }
     </style>
+       <style>
+        body { padding-top: 70px; } /* ป้องกัน Navbar ทับเนื้อหา */
+        .badge-success { background-color: #28a745; }
+        .badge-danger { background-color: #dc3545; }
+        .table-section { margin-bottom: 3rem; }
+    </style>
 </head>
 
 <body class="bg-light">
+        <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a id="navbar-brand-link" class="navbar-brand" href="#">
+                <i class="bi bi-shield-check"></i>
+                SQLMap Scanner <span id="admin-badge-container"></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul id="nav-links-placeholder" class="navbar-nav me-auto">
+                    </ul>
+                <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
     <div class="container py-4">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <h4 class="m-0">SQLMap Scanner — Step-by-step Progress</h4>
-            <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Logout</button>
+            <!-- <button id="logoutBtn" class="btn btn-outline-secondary btn-sm">Logout</button> -->
         </div>
 
         <div class="card mb-3">
@@ -109,8 +131,8 @@
                 </div>
                 <div class="modal-body">
                     <ul class="nav nav-tabs mb-3">
-                        <li class="nav-item"><button class="nav-link active" id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw">Raw JSON</button></li>
-                        <li class="nav-item"><button class="nav-link" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet">Sheet / Parsed</button></li>
+                        <li class="nav-item"><button class="nav-link " id="raw-tab" data-bs-toggle="tab" data-bs-target="#tab-raw">Raw JSON</button></li>
+                        <li class="nav-item"><button class="nav-link active" id="sheet-tab" data-bs-toggle="tab" data-bs-target="#tab-sheet">Sheet / Parsed</button></li>
                     </ul>
                     <div class="tab-content">
                         <div class="tab-pane fade show active" id="tab-raw">
@@ -154,7 +176,44 @@
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
 
     <script>
-        if (!checkAuth()) { /* Redirects if not logged in */ }
+                document.addEventListener('DOMContentLoaded', function () {
+            // --- Navbar Rendering Logic ---
+            const isAdmin = localStorage.getItem('is_admin') === 'true';
+            const navLinksContainer = document.getElementById('nav-links-placeholder');
+            const navBrandLink = document.getElementById('navbar-brand-link');
+            const adminBadgeContainer = document.getElementById('admin-badge-container');
+
+            let navLinksHtml = '';
+
+            // Set Brand link and Admin Badge
+            if (isAdmin) {
+                navBrandLink.href = '/admin/dashboard';
+                adminBadgeContainer.innerHTML = '<span class="badge bg-danger">Admin</span>';
+            } else {
+                navBrandLink.href = '/user/dashboard';
+            }
+
+            // Common links
+            const dashboardLink = isAdmin ? '/admin/dashboard' : '/user/dashboard';
+            navLinksHtml += `<li class="nav-item"><a class="nav-link" href="${dashboardLink}"><i class="bi bi-grid-1x2 me-1"></i>Dashboard</a></li>`;
+            navLinksHtml += `<li class="nav-item"><a class="nav-link " aria-current="page" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a></li>`;
+
+            // Admin-only link
+            if (isAdmin) {
+                navLinksHtml += `<li class="nav-item"><a class="nav-link active" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a></li>`;
+            }
+
+            navLinksContainer.innerHTML = navLinksHtml;
+
+            // Logout functionality
+            document.getElementById('logoutBtn').addEventListener('click', logout);
+
+            // --- Original Page Logic ---
+            if (!checkAuth()) { /* Redirects if not logged in */ }
+            // ... (ใส่โค้ด JavaScript เดิมของหน้านี้ต่อจากตรงนี้)
+        });
+   
+   
 
         const $ = id => document.getElementById(id);
         const log = (txt) => { const el = $('activityLog'); el.textContent = (new Date()).toLocaleTimeString() + "  " + txt + "\n" + el.textContent; };
