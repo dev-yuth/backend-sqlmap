@@ -47,7 +47,7 @@ def user_dashboard():
 def sqlmap_basic():
     return render_template("sqlmap_basic.html")
 
-@bp.route("/admin/users")
+@bp.route("/admin/user-management")
 @jwt_required(locations=["cookies"])
 @admin_required
 def admin_users_page():
