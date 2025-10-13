@@ -1,4 +1,4 @@
-
+# --- Common Directories & Files ---
 index.html
 index.php
 index.asp
@@ -53,7 +53,7 @@ private
 src
 source
 
-
+# --- Admin & Login Panels (Variations) ---
 admin/
 admin/login.php
 admin/index.php
@@ -79,8 +79,7 @@ sign-in
 signup
 sign-up
 
-
-
+# --- Framework & CMS Specific ---
 wp-admin
 wp-login.php
 wp-content
@@ -88,32 +87,17 @@ wp-includes
 wp-config.php
 wp-config-sample.php
 xmlrpc.php
-
-
-administrator
-configuration.php
 joomla
-
-
 user/login
 node/add
 CHANGELOG.txt
-
-
 .env
 .env.example
 public/
 vendor/
 storage/
 artisan
-
-
-admin/
-static/
-media/
 manage.py
-
-
 phpmyadmin
 phpMyAdmin
 pma
@@ -124,9 +108,8 @@ roundcube
 squirrelmail
 cgi-bin
 
-
+# --- API Endpoints ---
 api
-api/
 api/v1
 api/v2
 api/v3
@@ -143,14 +126,13 @@ api/auth
 api/login
 api/test
 
-
+# --- Development, Staging & Backup ---
 dev
 development
 stage
 staging
 prod
 production
-test
 testing
 qa
 uat
@@ -174,7 +156,7 @@ backup.tar.gz
 database.sql
 db.sql
 
-
+# --- Sensitive Files & Configs ---
 .git/config
 .svn/entries
 .DS_Store
@@ -205,65 +187,3 @@ Dockerfile
 docker-compose.yml
 README.md
 LICENSE
-
-
-.php
-.html
-.htm
-.txt
-.log
-.sql
-.zip
-.tar.gz
-.tgz
-.rar
-.bak
-.old
-.orig
-.inc
-.json
-.xml
-.config
-.conf
-.yml
-.yaml
-.md
-.sh
-.bash
-.py
-
-
-app
-application
-assets
-bin
-cache
-cgi-bin
-components
-core
-data
-dist
-docs
-etc
-export
-import
-includes
-install
-jobs
-kernel
-logs
-modules
-node_modules
-packages
-plugins
-scripts
-setup
-share
-system
-themes
-tools
-util
-utils
-var
-www
-wwwroot

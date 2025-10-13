@@ -2,18 +2,15 @@
 import asyncio
 import aiohttp
 import os
+import re
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required
 from app.utils.decorators import admin_required
 
 bp = Blueprint("network_scanner", __name__, url_prefix="/api/network")
 
-# --- START: ส่วนที่แก้ไข ---
-
-# 1. สร้าง Cache variable ไว้ที่ระดับ Module, เริ่มต้นเป็น None
 _WORDLIST_CACHE = None
 
-# 2. กำหนด List สำรองไว้เหมือนเดิม
 FALLBACK_PATHS = [
     "admin", "login", "dashboard", "test", "phpinfo.php", "e-learning",
     "backup", "dev", "staging", "api", "phpmyadmin", "wordpress", "wp-admin"
@@ -21,51 +18,46 @@ FALLBACK_PATHS = [
 
 def load_wordlist():
     """
-    โหลด Wordlist จากไฟล์ ../wordlists/common.txt
-    ฟังก์ชันนี้จะถูกเรียกใช้ภายใน request context เท่านั้น จึงปลอดภัย
+    Loads wordlist from ../wordlists/common.txt, falling back to an internal list if not found.
+    This is called only once within the application context.
     """
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-        print(base_dir)
         wordlist_path = os.path.join(base_dir, 'wordlists', 'common.txt')
-        print(wordlist_path)
         
         if not os.path.exists(wordlist_path):
             raise FileNotFoundError
 
         with open(wordlist_path, 'r', encoding='utf-8') as f:
-            wordlist = [line.strip() for line in f if line.strip()]
+            lines = [line.strip() for line in f]
+            wordlist = [line for line in lines if line and not re.search(r'\s', line) and not line.startswith('#')]
             return wordlist if wordlist else FALLBACK_PATHS
             
     except FileNotFoundError:
-        # ตอนนี้การเรียก logger ปลอดภัยแล้ว
         current_app.logger.warning("wordlists/common.txt not found. Using internal fallback wordlist.")
         return FALLBACK_PATHS
 
-# --- END: ส่วนที่แก้ไข ---
-
-
 async def check_path(session, base_url, path):
-    """ ตรวจสอบว่า Path ที่กำหนดมีอยู่จริงหรือไม่ """
+    """Checks if a given path exists on a base URL using the shared session."""
     url_to_check = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     try:
+        # The session is passed in, not created here.
         async with session.get(url_to_check, timeout=2, allow_redirects=False) as response:
             if response.status in [200, 301, 302, 403]:
                 return url_to_check
     except (asyncio.TimeoutError, aiohttp.ClientError):
-        pass
+        pass # Ignore timeouts and connection errors
     return None
 
-async def discover_content(base_url, wordlist):
-    """ ค้นหา Path ที่มีอยู่จริงจาก Wordlist ที่ส่งเข้ามา """
-    headers = {"User-Agent": "Mozilla/5.0"}
-    async with aiohttp.ClientSession(headers=headers) as session:
-        tasks = [check_path(session, base_url, path) for path in wordlist]
-        results = await asyncio.gather(*tasks)
-        return [res for res in results if res]
+async def discover_content(session, base_url, wordlist):
+    """Discovers content using the shared aiohttp session."""
+    # This function no longer creates its own session.
+    tasks = [check_path(session, base_url, path) for path in wordlist]
+    results = await asyncio.gather(*tasks)
+    return [res for res in results if res]
 
 async def check_port(host, port, timeout=0.5):
-    """ ตรวจสอบว่า port เปิดอยู่หรือไม่ """
+    """Checks if a TCP port is open."""
     try:
         conn = asyncio.open_connection(host, port)
         _, writer = await asyncio.wait_for(conn, timeout=timeout)
@@ -75,8 +67,10 @@ async def check_port(host, port, timeout=0.5):
     except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
         return False
 
-async def scan_host(host, wordlist):
-    """ สแกนหา port และค้นหา content บน host ที่กำหนด """
+async def scan_host(session, host, wordlist):
+    """
+    Scans a single host for open ports and discovers content using the shared session.
+    """
     http_task = asyncio.create_task(check_port(host, 80))
     https_task = asyncio.create_task(check_port(host, 443))
 
@@ -91,8 +85,8 @@ async def scan_host(host, wordlist):
         for proto in open_protocols:
             base_url = f"{proto}://{host}"
             result["urls"].append(base_url)
-            # ส่ง wordlist ที่โหลดมาแล้วเข้าไปใน task
-            discovery_tasks.append(discover_content(base_url, wordlist))
+            # Pass the shared session down to the discovery task
+            discovery_tasks.append(discover_content(session, base_url, wordlist))
 
         if discovery_tasks:
             all_found_paths = await asyncio.gather(*discovery_tasks)
@@ -104,7 +98,7 @@ async def scan_host(host, wordlist):
     return None
 
 def parse_ip_range(ip_range_str: str):
-    """ แปลง string '127.0.0.1-10' เป็น list ของ IP """
+    """Parses an IP range string like '192.168.1.1-254' into a list of IPs."""
     if '-' not in ip_range_str:
         return [ip_range_str.strip()]
         
@@ -125,15 +119,11 @@ def parse_ip_range(ip_range_str: str):
 @jwt_required(locations=["cookies"])
 @admin_required
 def scan_range():
-    """ รับช่วง IP และสแกนหา Web Server พร้อมทั้งค้นหา Content """
-    global _WORDLIST_CACHE # บอก Python ว่าเราจะแก้ไขตัวแปร global
+    """API endpoint to scan an IP range."""
+    global _WORDLIST_CACHE 
 
-    # --- START: ส่วนที่แก้ไข ---
-    # 3. ตรวจสอบ Cache: ถ้ายังว่างอยู่ (เป็น None) ให้เรียก load_wordlist()
-    #    ขั้นตอนนี้จะเกิดขึ้นแค่ครั้งแรกที่ API ถูกเรียกเท่านั้น
     if _WORDLIST_CACHE is None:
         _WORDLIST_CACHE = load_wordlist()
-    # --- END: ส่วนที่แก้ไข ---
 
     data = request.get_json()
     ip_range_str = data.get("ip_range")
@@ -147,15 +137,26 @@ def scan_range():
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
     
+    # --- START: Major Change - Centralized Session Management ---
     async def run_scan():
-        sem = asyncio.Semaphore(concurrency)
-        async def bounded_scan(ip):
-            async with sem:
-                # 4. ส่ง wordlist ที่อยู่ใน cache ไปให้ scan_host ใช้
-                return await scan_host(ip, _WORDLIST_CACHE)
-        tasks = [bounded_scan(ip) for ip in target_ips]
-        results = await asyncio.gather(*tasks)
-        return [res for res in results if res]
+        # Define connection limits to prevent resource exhaustion.
+        # This is the key fix for WinError 10055.
+        conn = aiohttp.TCPConnector(limit_per_host=20, limit=100)
+        headers = {"User-Agent": "Mozilla/5.0"}
+
+        # Create ONE session that will be shared by all tasks.
+        async with aiohttp.ClientSession(connector=conn, headers=headers) as session:
+            sem = asyncio.Semaphore(concurrency)
+            
+            async def bounded_scan(ip):
+                async with sem:
+                    # Pass the shared session into the scan_host function.
+                    return await scan_host(session, ip, _WORDLIST_CACHE)
+            
+            tasks = [bounded_scan(ip) for ip in target_ips]
+            results = await asyncio.gather(*tasks)
+            return [res for res in results if res]
+    # --- END: Major Change ---
 
     found_hosts = asyncio.run(run_scan())
 
