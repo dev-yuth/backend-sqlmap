@@ -1,0 +1,203 @@
+<!doctype html>
+<html lang="th">
+<head>
+    <meta charset="utf-8" />
+    <title>Network Scanner</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
+    <style>
+        body { padding-top: 70px; }
+        .result-box {
+            max-height: 500px;
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            padding: 1rem;
+            border-radius: 6px;
+            background-color: #f8f9fa;
+        }
+        .host-item {
+            display: flex;
+            flex-direction: column; 
+            align-items: flex-start;
+            padding: 0.75rem;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .host-item:last-child { border-bottom: none; }
+        .paths-container {
+            margin-top: 0.5rem;
+            padding-top: 0.5rem;
+            border-top: 1px dashed #ddd;
+        }
+    </style>
+</head>
+<body class="bg-light">
+
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
+        <div class="container-fluid">
+            <a id="navbar-brand-link" class="navbar-brand" href="#">
+                <i class="bi bi-shield-check"></i>
+                SQLMap Scanner <span id="admin-badge-container"></span>
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul id="nav-links-placeholder" class="navbar-nav me-auto">
+                    </ul>
+                <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container py-4">
+        <h4 class="mb-3">
+            <i class="bi bi-broadcast-pin me-2"></i>Network Host & Content Discovery
+        </h4>
+        <p class="text-muted">ค้นหา Web Server และ Path ที่มีอยู่จริงในช่วง IP ที่กำหนด</p>
+
+        <div class="card">
+            <div class="card-body">
+                <label for="ipRangeInput" class="form-label">IP Range</label>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="ipRangeInput" placeholder="เช่น 127.0.0.1-10 หรือ 192.168.1.1-254">
+                    <button id="startScanBtn" class="btn btn-primary">
+                        <i class="bi bi-search me-1"></i> Start Scan
+                    </button>
+                </div>
+                <div class="form-text">
+                    ระบุ IP เริ่มต้น และเลขท้ายของ IP สุดท้าย (คั่นด้วย -)
+                </div>
+                <hr class="my-4">
+
+                <h5 class="mb-3">ผลลัพธ์ (<span id="resultCount">0</span> พบ)</h5>
+                <div id="statusText" class="text-muted mb-2">
+                    <i class="bi bi-info-circle me-1"></i>
+                    พร้อมสำหรับการสแกน
+                </div>
+                <div class="result-box" id="resultsContainer">
+                    </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+    document.addEventListener('DOMContentLoaded', function () {
+        // --- Navbar Rendering Logic (Admin Only) ---
+        const isAdmin = localStorage.getItem('is_admin') === 'true';
+        if (!isAdmin) {
+             window.location.replace('/user/dashboard');
+             return;
+        }
+
+        const navLinksContainer = document.getElementById('nav-links-placeholder');
+        const navBrandLink = document.getElementById('navbar-brand-link');
+        const adminBadgeContainer = document.getElementById('admin-badge-container');
+
+        navBrandLink.href = '/admin/dashboard';
+        adminBadgeContainer.innerHTML = '<span class="badge bg-danger">Admin</span>';
+
+        navLinksContainer.innerHTML = `
+            <li class="nav-item"><a class="nav-link" href="/admin/dashboard"><i class="bi bi-grid-1x2 me-1"></i>Dashboard</a></li>
+            <li class="nav-item"><a class="nav-link" href="/admin/user-management"><i class="bi bi-people-fill me-1"></i>User Management</a></li>
+            <li class="nav-item"><a class="nav-link active" aria-current="page" href="/admin/network-scanner"><i class="bi bi-broadcast-pin me-1"></i>Network Scanner</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a></li>
+            <li class="nav-item"><a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a></li>
+        `;
+
+        document.getElementById('logoutBtn').addEventListener('click', logout);
+
+        // --- Page Logic ---
+        const $ = id => document.getElementById(id);
+
+        const startScanBtn = $('startScanBtn');
+        const ipRangeInput = $('ipRangeInput');
+        const resultsContainer = $('resultsContainer');
+        const resultCount = $('resultCount');
+        const statusText = $('statusText');
+
+        startScanBtn.addEventListener('click', async () => {
+            const ipRange = ipRangeInput.value.trim();
+            const concurrency = 150; 
+
+            if (!ipRange) {
+                alert('กรุณาระบุ IP Range');
+                return;
+            }
+
+            // UI feedback
+            startScanBtn.disabled = true;
+            startScanBtn.innerHTML = `<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Scanning...`;
+            resultsContainer.innerHTML = '';
+            resultCount.textContent = '0';
+            statusText.innerHTML = `<i class="bi bi-hourglass-split me-1"></i>กำลังสแกน, กรุณารอสักครู่...`;
+
+            try {
+                const response = await fetchWithAuth('/api/network/scan-range', {
+                    method: 'POST',
+                    body: JSON.stringify({ ip_range: ipRange, concurrency: concurrency })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok || !data.ok) {
+                    throw new Error(data.error || 'การสแกนล้มเหลว');
+                }
+                
+                statusText.innerHTML = `<i class="bi bi-check-circle-fill text-success me-1"></i>สแกนเสร็จสิ้น! พบ ${data.count} host.`;
+                resultCount.textContent = data.count;
+
+                if (data.found_hosts && data.found_hosts.length > 0) {
+                    data.found_hosts.forEach(host => {
+                        const item = document.createElement('div');
+                        item.className = 'host-item';
+                        
+                        let baseUrlsHtml = host.urls.map(url => 
+                            `<a href="${url}" target="_blank" class="badge bg-primary text-decoration-none me-1">${url}</a>`
+                        ).join('');
+                        
+                        let hostInfoHtml = `
+                            <div class="d-flex justify-content-between align-items-center w-100">
+                                <div class="fw-bold fs-5">${host.host}</div>
+                                <div>${baseUrlsHtml}</div>
+                            </div>
+                        `;
+                        
+                        let foundPathsHtml = '';
+                        if (host.found_paths && host.found_paths.length > 0) {
+                            let paths = host.found_paths.map(path => 
+                                `<a href="${path}" target="_blank" class="badge bg-success text-decoration-none me-1 mb-1">${path}</a>`
+                            ).join('');
+
+                            foundPathsHtml = `
+                                <div class="paths-container w-100">
+                                    <div class="small text-muted mb-1">
+                                        <i class="bi bi-folder2-open"></i> Discovered Paths:
+                                    </div>
+                                    <div>${paths}</div>
+                                </div>
+                            `;
+                        }
+                        
+                        item.innerHTML = hostInfoHtml + foundPathsHtml;
+
+                        resultsContainer.appendChild(item);
+                    });
+                } else {
+                    resultsContainer.innerHTML = '<div class="text-center p-3 text-muted">ไม่พบ Host ที่เปิด Web Server</div>';
+                }
+
+            } catch (error) {
+                console.error('Scan error:', error);
+                statusText.innerHTML = `<i class="bi bi-exclamation-triangle-fill text-danger me-1"></i>เกิดข้อผิดพลาด: ${error.message}`;
+                alert('เกิดข้อผิดพลาด: ' + error.message);
+            } finally {
+                startScanBtn.disabled = false;
+                startScanBtn.innerHTML = `<i class="bi bi-search me-1"></i> Start Scan`;
+            }
+        });
+    });
+    </script>
+</body>
+</html>

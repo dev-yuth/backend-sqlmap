@@ -9,6 +9,7 @@ def register_routes(app):
     from .log_api import bp as log_api_bp
     from .process_api import bp as process_api_bp
     from .llm_api import bp as llm_api_bp
+    from .network_scanner import bp as network_scanner_bp
  
 
     app.register_blueprint(auth_bp)
@@ -20,4 +21,5 @@ def register_routes(app):
     app.register_blueprint(log_api_bp)
     app.register_blueprint(process_api_bp)
     app.register_blueprint(llm_api_bp)
+    app.register_blueprint(network_scanner_bp)
 

@@ -56,3 +56,9 @@ def sqlmap_basic():
 def admin_users_page():
     """Renders the user management page for admins."""
     return render_template("admin_user_management.html")
+
+@bp.route("/admin/network-scanner")
+@jwt_required(locations=["cookies"])
+@admin_required
+def network_scanner_page():
+    return render_template("network_scanner.html")
