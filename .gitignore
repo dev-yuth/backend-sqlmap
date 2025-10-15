@@ -2,3 +2,5 @@ __pycache__
 .venv
 files/*
 app/files/*
+migrations/*
+app/static/reports/*

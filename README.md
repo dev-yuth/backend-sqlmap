@@ -100,3 +100,6 @@ py -3 -m pip install -r requirements.txt
 .venv\Scripts\activate
 python -m pip install -r requirements.txt
 python manage.py
+
+
+flask db upgrade

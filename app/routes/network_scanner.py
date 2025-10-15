@@ -3,9 +3,15 @@ import asyncio
 import aiohttp
 import os
 import re
+import json
+import uuid
+from datetime import datetime
 from flask import Blueprint, request, jsonify, current_app
-from flask_jwt_extended import jwt_required
+# --- CHANGE HERE: Import get_jwt_identity instead of get_current_user ---
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from app.utils.decorators import admin_required
+from app.extensions import db
+from app.models.network_scan import NetworkScan
 
 bp = Blueprint("network_scanner", __name__, url_prefix="/api/network")
 
@@ -16,11 +22,9 @@ FALLBACK_PATHS = [
     "backup", "dev", "staging", "api", "phpmyadmin", "wordpress", "wp-admin"
 ]
 
+# ... (โค้ดส่วนอื่นๆ ตั้งแต่ load_wordlist จนถึง parse_ip_range ยังคงเหมือนเดิม) ...
+
 def load_wordlist():
-    """
-    Loads wordlist from ../wordlists/common.txt, falling back to an internal list if not found.
-    This is called only once within the application context.
-    """
     try:
         base_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
         wordlist_path = os.path.join(base_dir, 'wordlists', 'common.txt')
@@ -38,26 +42,21 @@ def load_wordlist():
         return FALLBACK_PATHS
 
 async def check_path(session, base_url, path):
-    """Checks if a given path exists on a base URL using the shared session."""
     url_to_check = f"{base_url.rstrip('/')}/{path.lstrip('/')}"
     try:
-        # The session is passed in, not created here.
         async with session.get(url_to_check, timeout=2, allow_redirects=False) as response:
             if response.status in [200, 301, 302, 403]:
                 return url_to_check
     except (asyncio.TimeoutError, aiohttp.ClientError):
-        pass # Ignore timeouts and connection errors
+        pass
     return None
 
 async def discover_content(session, base_url, wordlist):
-    """Discovers content using the shared aiohttp session."""
-    # This function no longer creates its own session.
     tasks = [check_path(session, base_url, path) for path in wordlist]
     results = await asyncio.gather(*tasks)
     return [res for res in results if res]
 
 async def check_port(host, port, timeout=0.5):
-    """Checks if a TCP port is open."""
     try:
         conn = asyncio.open_connection(host, port)
         _, writer = await asyncio.wait_for(conn, timeout=timeout)
@@ -68,9 +67,6 @@ async def check_port(host, port, timeout=0.5):
         return False
 
 async def scan_host(session, host, wordlist):
-    """
-    Scans a single host for open ports and discovers content using the shared session.
-    """
     http_task = asyncio.create_task(check_port(host, 80))
     https_task = asyncio.create_task(check_port(host, 443))
 
@@ -80,28 +76,22 @@ async def scan_host(session, host, wordlist):
             
     if open_protocols:
         result = {"host": host, "status": "open", "urls": [], "found_paths": []}
-        
         discovery_tasks = []
         for proto in open_protocols:
             base_url = f"{proto}://{host}"
             result["urls"].append(base_url)
-            # Pass the shared session down to the discovery task
             discovery_tasks.append(discover_content(session, base_url, wordlist))
 
         if discovery_tasks:
             all_found_paths = await asyncio.gather(*discovery_tasks)
             for paths in all_found_paths:
                 result["found_paths"].extend(paths)
-        
         return result
-        
     return None
 
 def parse_ip_range(ip_range_str: str):
-    """Parses an IP range string like '192.168.1.1-254' into a list of IPs."""
     if '-' not in ip_range_str:
         return [ip_range_str.strip()]
-        
     parts = ip_range_str.split('-')
     base_ip_str = '.'.join(parts[0].split('.')[:-1])
     try:
@@ -109,25 +99,29 @@ def parse_ip_range(ip_range_str: str):
         end_ip_last_octet = int(parts[1])
     except (ValueError, IndexError):
         raise ValueError("Invalid IP range format")
-    
     if not (0 <= start_ip_last_octet <= 255 and 0 <= end_ip_last_octet <= 255 and start_ip_last_octet <= end_ip_last_octet):
         raise ValueError("Invalid IP range format")
-
     return [f"{base_ip_str}.{i}" for i in range(start_ip_last_octet, end_ip_last_octet + 1)]
 
+
 @bp.route("/scan-range", methods=["POST"])
-@jwt_required(locations=["cookies"])
+@jwt_required(locations=["cookies", "headers"])
 @admin_required
 def scan_range():
-    """API endpoint to scan an IP range."""
-    global _WORDLIST_CACHE 
-
+    """API endpoint to scan an IP range and save the process."""
+    global _WORDLIST_CACHE
     if _WORDLIST_CACHE is None:
         _WORDLIST_CACHE = load_wordlist()
 
     data = request.get_json()
+    if not data:
+        return jsonify({"ok": False, "error": "Invalid JSON payload"}), 400
+
     ip_range_str = data.get("ip_range")
     concurrency = int(data.get("concurrency", 150))
+    
+    # --- CHANGE HERE: Get user ID directly from the token's identity ---
+    current_user_id = get_jwt_identity()
 
     if not ip_range_str:
         return jsonify({"ok": False, "error": "ip_range is required"}), 400
@@ -136,33 +130,65 @@ def scan_range():
         target_ips = parse_ip_range(ip_range_str)
     except ValueError as e:
         return jsonify({"ok": False, "error": str(e)}), 400
-    
-    # --- START: Major Change - Centralized Session Management ---
+
+    new_scan = NetworkScan(
+        # --- CHANGE HERE: Use the ID we got from the identity ---
+        user_id=current_user_id,
+        ip_range=ip_range_str,
+        concurrency=concurrency,
+        status='running'
+    )
+    db.session.add(new_scan)
+    db.session.commit()
+
     async def run_scan():
-        # Define connection limits to prevent resource exhaustion.
-        # This is the key fix for WinError 10055.
         conn = aiohttp.TCPConnector(limit_per_host=20, limit=100)
         headers = {"User-Agent": "Mozilla/5.0"}
-
-        # Create ONE session that will be shared by all tasks.
         async with aiohttp.ClientSession(connector=conn, headers=headers) as session:
             sem = asyncio.Semaphore(concurrency)
-            
             async def bounded_scan(ip):
                 async with sem:
-                    # Pass the shared session into the scan_host function.
                     return await scan_host(session, ip, _WORDLIST_CACHE)
-            
             tasks = [bounded_scan(ip) for ip in target_ips]
             results = await asyncio.gather(*tasks)
             return [res for res in results if res]
-    # --- END: Major Change ---
 
-    found_hosts = asyncio.run(run_scan())
+    try:
+        found_hosts = asyncio.run(run_scan())
+        
+        reports_dir = os.path.join(current_app.static_folder, 'reports', 'network_scans')
+        os.makedirs(reports_dir, exist_ok=True)
+        result_filename = f"network_scan_{new_scan.id}_{uuid.uuid4().hex}.json"
+        result_filepath = os.path.join(reports_dir, result_filename)
 
-    return jsonify({
-        "ok": True,
-        "ip_range": ip_range_str,
-        "found_hosts": found_hosts,
-        "count": len(found_hosts)
-    })
+        scan_data = {
+            "scan_id": new_scan.id,
+            "ip_range": ip_range_str,
+            "found_hosts": found_hosts,
+            "count": len(found_hosts)
+        }
+        with open(result_filepath, 'w', encoding='utf-8') as f:
+            json.dump(scan_data, f, ensure_ascii=False, indent=4)
+        
+        new_scan.status = 'completed'
+        new_scan.found_hosts_count = len(found_hosts)
+        new_scan.result_json_path = os.path.join('reports', 'network_scans', result_filename).replace('\\', '/')
+        new_scan.completed_at = datetime.utcnow()
+        db.session.commit()
+
+        return jsonify({
+            "ok": True,
+            "found_hosts": found_hosts,
+            "count": len(found_hosts),
+            "scan_id": new_scan.id,
+            "message": "Scan completed successfully."
+        })
+
+    except Exception as e:
+        db.session.rollback() # Rollback transaction on error
+        new_scan.status = 'error'
+        new_scan.completed_at = datetime.utcnow()
+        db.session.add(new_scan)
+        db.session.commit()
+        current_app.logger.error(f"Error during network scan for id {new_scan.id}: {e}")
+        return jsonify({"ok": False, "error": "An internal error occurred during the scan."}), 500
