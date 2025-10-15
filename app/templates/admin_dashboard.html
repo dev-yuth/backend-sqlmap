@@ -1,4 +1,3 @@
-<!-- app/templates/admin_dashboard.html -->
 <!doctype html>
 <html lang="en">
 
@@ -21,37 +20,32 @@
         .badge-success {
             background-color: #28a745;
         }
-
         .badge-danger {
             background-color: #dc3545;
         }
-
+        .badge-warning {
+            background-color: #ffc107;
+        }
+        .badge-info {
+            background-color: #0dcaf0;
+        }
+        .badge-secondary {
+            background-color: #6c757d;
+        }
         .table-section {
             margin-bottom: 3rem;
         }
-    </style>
-    <style>
         body {
             padding-top: 70px;
         }
-
-        /* ป้องกัน Navbar ทับเนื้อหา */
-        .badge-success {
-            background-color: #28a745;
-        }
-
-        .badge-danger {
-            background-color: #dc3545;
-        }
-
-        .table-section {
-            margin-bottom: 3rem;
+        /* Style for better readability in the new modal */
+        .path-link {
+            word-break: break-all;
         }
     </style>
 </head>
 
 <body class="bg-light">
-    <!-- Navbar -->
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
         <div class="container-fluid">
             <a class="navbar-brand" href="/admin/dashboard">
@@ -82,7 +76,6 @@
                         <a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic
                             Scanner</a>
                     </li>
-
                 </ul>
                 <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
             </div>
@@ -90,27 +83,18 @@
     </nav>
 
     <div class="container mt-5">
-        <!-- Header Card -->
         <div class="card shadow p-4 mb-4">
             <h2 class="mb-3">Admin Dashboard</h2>
             <p class="text-muted">นี่คือหน้าสำหรับผู้ดูแลระบบ (is_admin=1)</p>
         </div>
 
-        <!-- Process History Table -->
         <div class="card shadow p-4 table-section">
             <h3 class="mb-3">ประวัติการทำงาน SQLMap ของผู้ใช้ทั้งหมด</h3>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered align-middle" id="processTable">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
-                            <th>Username</th>
-                            <th>Endpoint</th>
-                            <th>จำนวน Url</th>
-                            <th>สถานะ</th>
-                            <th>PDF</th>
-                            <th></th>
-                            <th>เวลา</th>
+                            <th>ID</th><th>Username</th><th>Endpoint</th><th>จำนวน Url</th><th>สถานะ</th><th>PDF</th><th></th><th>เวลา</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -119,18 +103,29 @@
             <p class="text-muted small">แสดงข้อมูล 100-200 รายการล่าสุด</p>
         </div>
 
-        <!-- Login Log Table -->
+        <div class="card shadow p-4 table-section">
+            <h3 class="mb-3">ประวัติการสแกนเครือข่าย</h3>
+            <div class="table-responsive">
+                <table class="table table-striped table-bordered align-middle" id="networkScanTable">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th><th>Username</th><th>IP Range</th><th>Concurrency</th><th>Status</th><th>Hosts Found</th><th>Created At</th><th>Completed At</th><th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+            <p class="text-muted small">อัปเดตอัตโนมัติทุก 1 นาที</p>
+        </div>
+
+
         <div class="card shadow p-4 table-section">
             <h3 class="mb-3">ประวัติการเข้าสู่ระบบของผู้ใช้ทั้งหมด</h3>
             <div class="table-responsive">
                 <table class="table table-striped table-bordered align-middle" id="logTable">
                     <thead class="table-dark">
                         <tr>
-                            <th>เวลา</th>
-                            <th>Username</th>
-                            <th>IP</th>
-                            <th>User Agent</th>
-                            <th>สถานะ</th>
+                            <th>เวลา</th><th>Username</th><th>IP</th><th>User Agent</th><th>สถานะ</th>
                         </tr>
                     </thead>
                     <tbody></tbody>
@@ -140,7 +135,6 @@
         </div>
     </div>
 
-    <!-- Detail Modal -->
     <div class="modal fade" id="detailModal" tabindex="-1">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -159,6 +153,7 @@
             </div>
         </div>
     </div>
+    
     <div class="modal fade" id="aiModal" tabindex="-1" aria-hidden="true">
         <div class="modal-dialog modal-xl modal-dialog-scrollable">
             <div class="modal-content">
@@ -180,11 +175,33 @@
         </div>
     </div>
 
+    <div class="modal fade" id="networkScanResultModal" tabindex="-1">
+        <div class="modal-dialog modal-xl modal-dialog-scrollable">
+            <div class="modal-content">
+                <div class="modal-header bg-dark text-white">
+                    <h5 class="modal-title">Network Scan Result</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div id="networkScanResultContent">
+                        <p class="text-muted text-center">Loading...</p>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <a id="downloadJsonBtn" href="#" class="btn btn-success btn-sm" download>
+                        <i class="bi bi-download"></i> Download JSON
+                    </a>
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Close</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+
     <script>
         document.addEventListener("DOMContentLoaded", function () {
             const DC = window.DashboardCommon;
 
-            // ตรวจสอบ Auth
             if (!DC.initAuth()) return;
 
             const isAdmin = DC.getUserRole();
@@ -193,36 +210,51 @@
                 return;
             }
 
-            // สร้าง Navbar
-            // DC.renderNavbar(true);
-            // 💡 **แก้ไข:** เพิ่มฟังก์ชัน escapeHtml ที่ขาดหายไปเพื่อแก้ Error
             function escapeHtml(s) {
                 if (!s && s !== 0) return '';
                 return String(s).replace(/[&<>"'`=\/]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '/': '&#x2F;', '`': '&#x60;', '=': '&#x3D;' }[c]));
             }
-            // ตั้งค่า DataTables
+
             const processTable = $('#processTable').DataTable({
                 columns: [
-                    { data: 'id' },
-                    { data: 'username' },
-                    { data: 'endpoint' },
-                    { data: 'payload_count' },
+                    { data: 'id' }, { data: 'username' }, { data: 'endpoint' }, { data: 'payload_count' },
+                    { data: 'status_ok', render: (data) => DC.statusBadge(data) },
+                    { data: null, render: (data, type, row) => DC.pdfButton(row.id, row.result_pdf) },
+                    { data: null, render: (data, type, row) => `<button class="btn btn-sm btn-info view-details" data-id="${row.id}">🔍 ดู</button>` },
+                    { data: 'created_at', render: (data) => DC.formatDate(data) }
+                ],
+                order: [[0, 'desc']],
+                pageLength: 10
+            });
+
+            const networkScanTable = $('#networkScanTable').DataTable({
+                columns: [
+                    { data: 'id' }, { data: 'username' }, { data: 'ip_range' }, { data: 'concurrency' },
                     {
-                        data: 'status_ok',
-                        render: (data) => DC.statusBadge(data)
+                        data: 'status',
+                        render: function (data) {
+                            switch (data) {
+                                case 'Success': return '<span class="badge badge-success">Success</span>';
+                                case 'Running': return '<span class="badge badge-info">Running</span>';
+                                case 'Pending': return '<span class="badge badge-warning">Pending</span>';
+                                case 'Error': return '<span class="badge badge-danger">Error</span>';
+                                default: return `<span class="badge badge-secondary">${escapeHtml(data)}</span>`;
+                            }
+                        }
                     },
+                    { data: 'found_hosts_count' },
+                    { data: 'created_at', render: (data) => DC.formatDate(data) },
+                    { data: 'completed_at', render: (data) => data ? DC.formatDate(data) : 'N/A' },
                     {
+                        // --- *** UPDATED RENDER FUNCTION *** ---
                         data: null,
-                        render: (data, type, row) => DC.pdfButton(row.id, row.result_pdf)
-                    },
-                    {
-                        data: null,
-                        render: (data, type, row) =>
-                            `<button class="btn btn-sm btn-info view-details" data-id="${row.id}">🔍 ดู</button>`
-                    },
-                    {
-                        data: 'created_at',
-                        render: (data) => DC.formatDate(data)
+                        render: function (data, type, row) {
+                            if (row.status === 'Success' && row.result_json_path) {
+                                // Changed to a button that opens the new modal
+                                return `<button class="btn btn-sm btn-primary view-scan-details" data-id="${row.id}" data-bs-toggle="modal" data-bs-target="#networkScanResultModal"><i class="bi bi-eye-fill"></i></button>`;
+                            }
+                            return `No actions`; // Removed debug text
+                        }
                     }
                 ],
                 order: [[0, 'desc']],
@@ -231,63 +263,92 @@
 
             const logTable = $('#logTable').DataTable({
                 columns: [
-                    {
-                        data: 'created_at',
-                        render: (data) => DC.formatDate(data)
-                    },
-                    { data: 'username' },
-                    { data: 'ip_address' },
-                    { data: 'user_agent' },
-                    {
-                        data: 'success',
-                        render: (data) => data ? "✅ Success" : "❌ Failed"
-                    }
+                    { data: 'created_at', render: (data) => DC.formatDate(data) }, { data: 'username' },
+                    { data: 'ip_address' }, { data: 'user_agent' },
+                    { data: 'success', render: (data) => data ? "✅ Success" : "❌ Failed" }
                 ],
                 order: [[0, 'desc']],
                 pageLength: 5
             });
 
-            // โหลดข้อมูล Process
-            async function loadProcesses() {
-                await DC.fetchData(
-                    "/api/processes/all",
-                    (data) => {
-                        processTable.clear().rows.add(data).draw();
-                    },
-                    (err) => DC.handleAuthError(err, loadProcesses)
-                );
-            }
+            async function loadProcesses() { await DC.fetchData("/api/processes/all", (data) => { processTable.clear().rows.add(data).draw(); }, (err) => DC.handleAuthError(err, loadProcesses)); }
+            async function loadNetworkScans() { await DC.fetchData("/api/network-scans/all", (data) => { networkScanTable.clear().rows.add(data).draw(); }, (err) => DC.handleAuthError(err, loadNetworkScans)); }
+            async function loadLogs() { await DC.fetchData("/api/logs/all", (data) => { logTable.clear().rows.add(data).draw(); }, (err) => DC.handleAuthError(err, loadLogs)); }
 
-            // โหลดข้อมูล Logs
-            async function loadLogs() {
-                await DC.fetchData(
-                    "/api/logs/all",
-                    (data) => {
-                        logTable.clear().rows.add(data).draw();
-                    },
-                    (err) => DC.handleAuthError(err, loadLogs)
-                );
-            }
-
-            // แสดงรายละเอียด Process
             $('#processTable tbody').on('click', '.view-details', function () {
                 const row = processTable.row($(this).closest('tr')).data();
                 showProcessDetails(row);
             });
+            
+            // --- *** NEW EVENT LISTENER FOR NETWORK SCAN DETAILS *** ---
+            $('#networkScanTable tbody').on('click', '.view-scan-details', async function () {
+                const scanId = $(this).data('id');
+                const modalContent = document.getElementById('networkScanResultContent');
+                const downloadBtn = document.getElementById('downloadJsonBtn');
 
-            // 💡 **แก้ไข:** เพิ่มฟังก์ชัน analyzePayload ที่ขาดหายไป
+                modalContent.innerHTML = '<div class="text-center"><div class="spinner-border" role="status"><span class="visually-hidden">Loading...</span></div></div>';
+                downloadBtn.href = '#'; 
+
+                try {
+                    await DC.fetchData(`/api/network-scans/results/${scanId}`, (data) => {
+                        let html = `<h6>IP Range: <code>${escapeHtml(data.ip_range)}</code></h6><p class="text-muted">Total Hosts Found: ${data.count}</p><hr>`;
+                        
+                        if (data.found_hosts && data.found_hosts.length > 0) {
+                            html += '<div class="accordion" id="hostsAccordion">';
+                            data.found_hosts.forEach((host, index) => {
+                                const collapseId = `collapse-${index}`;
+                                const headerId = `header-${index}`;
+                                html += `
+                                    <div class="accordion-item">
+                                        <h2 class="accordion-header" id="${headerId}">
+                                            <button class="accordion-button collapsed" type="button" data-bs-toggle="collapse" data-bs-target="#${collapseId}">
+                                                <strong>Host: ${escapeHtml(host.host)}</strong>
+                                            </button>
+                                        </h2>
+                                        <div id="${collapseId}" class="accordion-collapse collapse" data-bs-parent="#hostsAccordion">
+                                            <div class="accordion-body">
+                                                <strong><i class="bi bi-link-45deg"></i> URLs:</strong><br>`;
+                                if (host.urls && host.urls.length > 0) {
+                                    host.urls.forEach(url => { html += `<a href="${escapeHtml(url)}" target="_blank" class="btn btn-sm btn-outline-info me-1 mb-1">${escapeHtml(url)}</a>`; });
+                                } else { html += `<span class="text-muted small">No URLs found.</span>`; }
+                                
+                                html += `<br><br><strong><i class="bi bi-folder2-open"></i> Discovered Paths:</strong>`;
+                                if (host.found_paths && host.found_paths.length > 0) {
+                                    html += '<div class="list-group list-group-flush mt-2" style="max-height: 250px; overflow-y: auto;">';
+                                    host.found_paths.forEach(path => { html += `<a href="${escapeHtml(path)}" target="_blank" class="list-group-item list-group-item-action path-link py-1">${escapeHtml(path)}</a>`; });
+                                    html += '</div>';
+                                } else { html += `<br><span class="text-muted small">No paths discovered.</span>`; }
+                                html += `</div></div></div>`;
+                            });
+                            html += '</div>';
+                        } else {
+                            html += '<p class="text-muted">No hosts found.</p>';
+                        }
+                        
+                        modalContent.innerHTML = html;
+                        downloadBtn.href = `/api/network-scans/results/${scanId}`;
+                        downloadBtn.download = `scan_result_${scanId}.json`;
+                    }, 
+                    (err) => {
+                         modalContent.innerHTML = `<p class="text-danger text-center">Failed to load results: ${err.message}</p>`;
+                    });
+                } catch (error) {
+                    console.error("Error fetching scan details:", error);
+                    modalContent.innerHTML = `<p class="text-danger text-center">An unexpected error occurred.</p>`;
+                }
+            });
+
+            // Original analyzePayload function
             async function analyzePayload(title, type) {
                 const modalEl = document.getElementById('aiModal');
                 const aiModal = new bootstrap.Modal(modalEl);
                 const payloadEl = document.getElementById('aiPayload');
                 const resultEl = document.getElementById('aiResult');
-
                 payloadEl.innerHTML = `<pre style="white-space:pre-wrap; font-size: 0.9rem;"><strong>Title:</strong> ${escapeHtml(title)}\n<strong>Type:</strong> ${escapeHtml(type)}</pre>`;
                 resultEl.innerHTML = '<div class="spinner-border spinner-border-sm" role="status"><span class="visually-hidden">Loading...</span></div>';
                 aiModal.show();
-
                 try {
-                    // 💡 **แก้ไข:** เรียกใช้ fetchWithAuth() โดยตรง
+                    // This function is still present and unchanged from your original file
                     const res = await fetchWithAuth('/api/llm/analyze-payload', {
                         method: 'POST',
                         body: JSON.stringify({ title, type })
@@ -304,25 +365,20 @@
                 }
             }
 
-
-            // 💡 **ปรับปรุง:** ยกเครื่องฟังก์ชัน `showProcessDetails` ทั้งหมด
+            // Original showProcessDetails function
             function showProcessDetails(row) {
                 const modal = new bootstrap.Modal(document.getElementById('detailModal'));
                 const content = document.getElementById('detailContent');
-
                 let html = `<h5>🔎 Endpoint: <code>${row.endpoint}</code></h5><p>สถานะ: ${DC.statusBadge(row.status_ok)}</p><hr>`;
-
                 if (!row.result_json) {
                     html += `<p class="text-danger">ไม่พบข้อมูล JSON</p>`;
                     content.innerHTML = html;
                     modal.show();
                     return;
                 }
-
                 try {
                     const result = typeof row.result_json === "string" ? JSON.parse(row.result_json) : row.result_json;
                     const urls = Array.isArray(result) ? result : [result];
-
                     html += `<div class="row">
                                 <div class="col-4 border-end pe-2" style="max-height: 60vh; overflow-y: auto;">
                                     <h6>🌐 รายการ URL (${urls.length})</h6>
@@ -335,18 +391,14 @@
                                 </div>
                             </div>`;
                     content.innerHTML = html;
-
                     document.querySelectorAll('#urlListInModal li').forEach(li => {
                         li.addEventListener('click', function () {
                             const idx = parseInt(this.dataset.index);
                             document.querySelectorAll('#urlListInModal li').forEach(x => x.classList.remove('active'));
                             this.classList.add('active');
-
                             const u = urls[idx];
                             const urlDetailContainer = document.getElementById('urlDetailInModal');
                             let detail = `<h6>🔗 URL: <code>${escapeHtml(u.url || '-')}</code></h6>`;
-
-                            // **ปรับปรุง:** วนลูป findings และสร้างกล่องพร้อมปุ่ม Analyze
                             if (u.parametersRaw?.length) {
                                 detail += `<h6 class="mt-3">🎯 Findings</h6>`;
                                 u.parametersRaw.forEach((p) => {
@@ -365,13 +417,8 @@
                                             </div>`;
                                     });
                                 });
-                            } else {
-                                detail += `<p class="text-muted mt-3">ไม่พบช่องโหว่ (No findings)</p>`;
-                            }
-
+                            } else { detail += `<p class="text-muted mt-3">ไม่พบช่องโหว่ (No findings)</p>`; }
                             urlDetailContainer.innerHTML = detail;
-
-                            // **สำคัญ:** เพิ่ม Event Listener ให้กับปุ่ม "Analyze" ที่เพิ่งสร้างขึ้นมาใหม่
                             urlDetailContainer.querySelectorAll('.btn-analyze').forEach(button => {
                                 button.addEventListener('click', function () {
                                     analyzePayload(this.dataset.title, this.dataset.type);
@@ -379,7 +426,6 @@
                             });
                         });
                     });
-
                 } catch (err) {
                     console.error("Error parsing result_json:", err);
                     html += `<p class="text-danger">ไม่สามารถแสดงข้อมูล JSON ได้</p>`;
@@ -388,12 +434,14 @@
                 modal.show();
             }
 
-            // Auto Refresh
-            DC.setupAutoRefresh([loadProcesses, loadLogs]);
+            // Initial data load and Auto Refresh
+            loadProcesses();
+            loadNetworkScans();
+            loadLogs();
+            DC.setupAutoRefresh([loadProcesses, loadNetworkScans, loadLogs]);
         });
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-
 </html>

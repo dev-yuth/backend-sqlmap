@@ -136,7 +136,7 @@ def scan_range():
         user_id=current_user_id,
         ip_range=ip_range_str,
         concurrency=concurrency,
-        status='running'
+        status=1
     )
     db.session.add(new_scan)
     db.session.commit()
@@ -170,7 +170,7 @@ def scan_range():
         with open(result_filepath, 'w', encoding='utf-8') as f:
             json.dump(scan_data, f, ensure_ascii=False, indent=4)
         
-        new_scan.status = 1
+        new_scan.status = 2
         new_scan.found_hosts_count = len(found_hosts)
         new_scan.result_json_path = os.path.join('reports', 'network_scans', result_filename).replace('\\', '/')
         new_scan.completed_at = datetime.utcnow()
@@ -186,7 +186,7 @@ def scan_range():
 
     except Exception as e:
         db.session.rollback() # Rollback transaction on error
-        new_scan.status = 'error'
+        new_scan.status = 3
         new_scan.completed_at = datetime.utcnow()
         db.session.add(new_scan)
         db.session.commit()
