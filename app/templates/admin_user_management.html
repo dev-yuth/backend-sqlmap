@@ -1,23 +1,41 @@
 <!doctype html>
 <html lang="en">
+
 <head>
     <meta charset="utf-8">
     <title>User Management</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <style>
-        body { padding-top: 70px; background-color: #f8f9fa; }
-        .table-responsive { margin-top: 1rem; }
-        .form-switch .form-check-input { width: 3.5em; height: 1.75em; cursor: pointer; }
-        .container { max-width: 960px; }
-        
+        body {
+            padding-top: 70px;
+            background-color: #f8f9fa;
+        }
+
+        .table-responsive {
+            margin-top: 1rem;
+        }
+
+        .form-switch .form-check-input {
+            width: 3.5em;
+            height: 1.75em;
+            cursor: pointer;
+        }
+
+        .container {
+            max-width: 960px;
+        }
+
         /* CSS สำหรับ Checkbox สลับการแสดงรหัสผ่าน */
         .password-toggle-container {
             position: relative;
         }
+
         .password-toggle-container .form-control {
-            padding-right: 3rem; /* สร้างพื้นที่สำหรับไอคอน */
+            padding-right: 3rem;
+            /* สร้างพื้นที่สำหรับไอคอน */
         }
+
         .password-toggle-checkbox {
             position: absolute;
             top: 50%;
@@ -27,24 +45,30 @@
             cursor: pointer;
             width: 1.5rem;
             height: 1.5rem;
-            opacity: 0; /* ซ่อน checkbox จริง */
+            opacity: 0;
+            /* ซ่อน checkbox จริง */
         }
+
         .password-toggle-icon {
             position: absolute;
             top: 50%;
             right: 0.75rem;
             transform: translateY(-50%);
-            pointer-events: none; /* ทำให้คลิกผ่านไปที่ checkbox */
+            pointer-events: none;
+            /* ทำให้คลิกผ่านไปที่ checkbox */
             color: #6c757d;
         }
-        .password-toggle-checkbox:checked ~ .password-toggle-icon-show {
+
+        .password-toggle-checkbox:checked~.password-toggle-icon-show {
             display: none;
         }
-        .password-toggle-checkbox:not(:checked) ~ .password-toggle-icon-hide {
+
+        .password-toggle-checkbox:not(:checked)~.password-toggle-icon-hide {
             display: none;
         }
     </style>
 </head>
+
 <body>
 
     <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top shadow-sm">
@@ -59,18 +83,25 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link " aria-current="page" href="/admin/dashboard"> <i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                        <a class="nav-link " aria-current="page" href="/admin/dashboard"> <i
+                                class="bi bi-speedometer2 me-1"></i>Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link active" href="/admin/user-management">  <i class="bi bi-people-fill me-1" aria-hidden="true"></i>User Management</a>
+                        <a class="nav-link active" href="/admin/user-management"> <i class="bi bi-people-fill me-1"
+                                aria-hidden="true"></i>User Management</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/network-scanner">
+                            <i class="bi bi-broadcast-pin me-1"></i>Network Scanner</a>
                     </li>
                     <li class="nav-item">
                         <a class="nav-link" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a>
+                        <a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic
+                            Scanner</a>
                     </li>
-                    
+
                 </ul>
                 <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
             </div>
@@ -138,7 +169,8 @@
     </div>
 
     <!-- Reset Password Modal -->
-    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel" aria-hidden="true">
+    <div class="modal fade" id="resetPasswordModal" tabindex="-1" aria-labelledby="resetPasswordModalLabel"
+        aria-hidden="true">
         <div class="modal-dialog">
             <div class="modal-content">
                 <div class="modal-header">
@@ -149,7 +181,7 @@
                     <form id="resetPasswordForm">
                         <input type="hidden" id="resetUserId">
                         <p>Resetting password for: <strong id="resetUsername"></strong></p>
-                        
+
                         <div class="mb-3">
                             <label for="newPassword" class="form-label">New Password</label>
                             <div class="password-toggle-container">
@@ -201,13 +233,13 @@
             const newPasswordInput = document.getElementById('newPassword');
             const togglePasswordCheckbox = document.getElementById('togglePasswordVisibility');
 
-            
+
             async function loadUsers() {
-                 try {
+                try {
                     const response = await fetchWithAuth('/api/user/users');
                     if (!response.ok) throw new Error('Failed to fetch users');
                     const users = await response.json();
-                    
+
                     userTableBody.innerHTML = ''; // Clear existing table data
                     if (users.length === 0) {
                         userTableBody.innerHTML = '<tr><td colspan="6" class="text-center">No users found.</td></tr>';
@@ -243,7 +275,7 @@
                     Swal.fire({ icon: 'error', title: 'Error', text: 'Could not load user data.' });
                 }
             }
-            
+
             async function handleStatusChange(event) {
                 const userId = event.target.dataset.userId;
                 const is_active = event.target.checked;
@@ -274,7 +306,7 @@
                 // เปิด Modal
                 resetPasswordModal.show();
             }
-            
+
             // ฟังก์ชันสำหรับสร้างรหัสผ่านแบบสุ่ม (Client-side)
             function generateRandomPassword() {
                 const length = 12;
@@ -288,7 +320,7 @@
 
             // Event listener สำหรับปุ่ม Generate Password
             document.getElementById('generatePasswordBtn').addEventListener('click', generateRandomPassword);
-            
+
             // Event listener สำหรับ Checkbox สลับการแสดงรหัสผ่าน
             togglePasswordCheckbox.addEventListener('change', () => {
                 const type = newPasswordInput.getAttribute('type') === 'password' ? 'text' : 'password';
@@ -300,13 +332,13 @@
                 event.preventDefault();
                 const userId = document.getElementById('resetUserId').value;
                 const password = newPasswordInput.value;
-                
+
                 try {
                     const response = await fetchWithAuth(`/api/user/users/${userId}/password`, {
                         method: 'PUT',
                         body: JSON.stringify({ password })
                     });
-                    
+
                     if (!response.ok) {
                         const errorData = await response.json();
                         throw new Error(errorData.error || 'Failed to update password');
@@ -343,7 +375,7 @@
                     }
                     addUserForm.reset();
                     addUserModal.hide();
-                    
+
                     Swal.fire({
                         icon: 'success',
                         title: 'User Created!',
@@ -352,7 +384,7 @@
                         showConfirmButton: false
                     });
                     await loadUsers();
-                    
+
                 } catch (error) {
                     Swal.fire({ icon: 'error', title: 'Oops...', text: error.message });
                 }
@@ -364,5 +396,5 @@
         });
     </script>
 </body>
-</html>
 
+</html>

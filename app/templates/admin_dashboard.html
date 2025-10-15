@@ -6,7 +6,7 @@
     <meta charset="utf-8">
     <title>Admin Dashboard</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link rel="stylesheet" href="https://cdn.datatables.net/1.13.6/css/dataTables.bootstrap5.min.css">
 
     <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
@@ -30,11 +30,23 @@
             margin-bottom: 3rem;
         }
     </style>
-        <style>
-        body { padding-top: 70px; } /* ป้องกัน Navbar ทับเนื้อหา */
-        .badge-success { background-color: #28a745; }
-        .badge-danger { background-color: #dc3545; }
-        .table-section { margin-bottom: 3rem; }
+    <style>
+        body {
+            padding-top: 70px;
+        }
+
+        /* ป้องกัน Navbar ทับเนื้อหา */
+        .badge-success {
+            background-color: #28a745;
+        }
+
+        .badge-danger {
+            background-color: #dc3545;
+        }
+
+        .table-section {
+            margin-bottom: 3rem;
+        }
     </style>
 </head>
 
@@ -52,18 +64,25 @@
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul class="navbar-nav me-auto">
                     <li class="nav-item">
-                        <a class="nav-link active" aria-current="page" href="/admin/dashboard"> <i class="bi bi-speedometer2 me-1"></i>Dashboard</a>
+                        <a class="nav-link active" aria-current="page" href="/admin/dashboard"> <i
+                                class="bi bi-speedometer2 me-1"></i>Dashboard</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/admin/user-management">  <i class="bi bi-people-fill me-1" aria-hidden="true"></i>User Management</a>
+                        <a class="nav-link" href="/admin/user-management"> <i class="bi bi-people-fill me-1"
+                                aria-hidden="true"></i>User Management</a>
                     </li>
-                     <li class="nav-item">
+                    <li class="nav-item">
+                        <a class="nav-link" href="/admin/network-scanner">
+                            <i class="bi bi-broadcast-pin me-1"></i>Network Scanner</a>
+                    </li>
+                    <li class="nav-item">
                         <a class="nav-link" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a>
+                        <a class="nav-link" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic
+                            Scanner</a>
                     </li>
-                   
+
                 </ul>
                 <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
             </div>

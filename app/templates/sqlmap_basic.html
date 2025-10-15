@@ -5,7 +5,7 @@
     <meta charset="utf-8" />
     <title>SQLMap Basic Scanner</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.1/dist/css/bootstrap.min.css" rel="stylesheet">
-     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script src="{{ url_for('static', filename='js/dashboard.js') }}"></script>
     <style>
         /* CSS styles remain unchanged */
@@ -211,7 +211,7 @@
             </button>
             <div class="collapse navbar-collapse" id="navbarNav">
                 <ul id="nav-links-placeholder" class="navbar-nav me-auto">
-                    </ul>
+                </ul>
                 <button id="logoutBtn" class="btn btn-outline-light btn-sm">Logout</button>
             </div>
         </div>
@@ -353,15 +353,19 @@
             // Common links
             const dashboardLink = isAdmin ? '/admin/dashboard' : '/user/dashboard';
             navLinksHtml += `<li class="nav-item"><a class="nav-link" href="${dashboardLink}"><i class="bi bi-speedometer2 me-1"></i>Dashboard</a></li>`;
-             if (isAdmin) {
+            if (isAdmin) {
                 navLinksHtml += `<li class="nav-item">
                         <a class="nav-link" href="/admin/user-management">  <i class="bi bi-people-fill me-1" aria-hidden="true"></i>User Management</a>
+                    </li>`;
+                navLinksHtml += `<li class="nav-item">
+                        <a class="nav-link" href="/admin/network-scanner">
+                            <i class="bi bi-broadcast-pin me-1"></i>Network Scanner</a>
                     </li>`;
                 navLinksHtml += `<li class="nav-item"><a class="nav-link active" href="/sqlmap-urls"><i class="bi bi-link-45deg me-1"></i>URLs Scanner</a></li>`;
             }
             navLinksHtml += `<li class="nav-item"><a class="nav-link active" aria-current="page" href="/sqlmap-basic"><i class="bi bi-file-earmark-code-fill me-1"></i>Basic Scanner</a></li>`;
 
-           
+
 
             navLinksContainer.innerHTML = navLinksHtml;
 
@@ -372,7 +376,7 @@
             if (!checkAuth()) { /* Redirects if not logged in */ }
             // ... (ใส่โค้ด JavaScript เดิมของหน้านี้ต่อจากตรงนี้)
         });
-   
+
         const $ = id => document.getElementById(id);
         const setStep = (num, state) => { const el = $('step-' + num); if (!el) return; el.classList.remove('active', 'done'); if (state === 'active') el.classList.add('active'); if (state === 'done') el.classList.add('done'); };
         const setProgress = p => { const el = $('progressBar'); el.style.width = p + '%'; el.textContent = p + '%'; };

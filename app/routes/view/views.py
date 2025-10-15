@@ -60,5 +60,6 @@ def admin_users_page():
 @bp.route("/admin/network-scanner")
 @jwt_required(locations=["cookies"])
 @admin_required
+@active_user_required # เพิ่ม decorator ตรงนี้
 def network_scanner_page():
     return render_template("network_scanner.html")
