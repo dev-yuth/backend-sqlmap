@@ -170,7 +170,7 @@ def scan_range():
         with open(result_filepath, 'w', encoding='utf-8') as f:
             json.dump(scan_data, f, ensure_ascii=False, indent=4)
         
-        new_scan.status = 'completed'
+        new_scan.status = 1
         new_scan.found_hosts_count = len(found_hosts)
         new_scan.result_json_path = os.path.join('reports', 'network_scans', result_filename).replace('\\', '/')
         new_scan.completed_at = datetime.utcnow()
