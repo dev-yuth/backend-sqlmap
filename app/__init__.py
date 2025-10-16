@@ -1,8 +1,9 @@
 # app/__init__.py
 from flask import Flask
 from .config import Config
-from .extensions import db, jwt, cors, migrate
+from .extensions import db, migrate, jwt, cors, mail
 from .routes import register_routes
+
 
 # import models for alembic
 from app.models.user import User
@@ -26,7 +27,7 @@ def create_app(config_object: object | None = None):
 
     # optional: set cookie names or expirations ifต้องการ
     # app.config["JWT_ACCESS_COOKIE_NAME"] = "access_token_cookie"
-
+ 
     # init extensions (หลังตั้งค่า)
     db.init_app(app)
     migrate.init_app(app, db)
@@ -34,7 +35,12 @@ def create_app(config_object: object | None = None):
     # CORS: allow credentials ถ้า frontend แยก origin (เช่น localhost:3000)
     # cors.init_app(app, origins=app.config.get("CORS_ORIGINS", []), supports_credentials=True)
     cors.init_app(app, origins=["http://localhost:5000"], supports_credentials=True)
+
+    # Initialize Flask-Mail
+    mail.init_app(app)
     # register blueprints
     register_routes(app)
+
+   
 
     return app

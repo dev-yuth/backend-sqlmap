@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ผลการสแกนความปลอดภัย</title>
+</head>
+<body style="font-family: sans-serif; padding: 20px;">
+    <h2 style="color: #333;">ผลการสแกนความปลอดภัย</h2>
+    <p>เรียนผู้ใช้งาน,</p>
+    <p>นี่คือสรุปผลการสแกนที่คุณร้องขอสำหรับ: <strong>{{ report_data.url }}</strong></p>
+    
+    <h4 style="color: #555;">สรุปผล:</h4>
+    <ul>
+        <li><b>URL:</b> {{ report_data.url }}</li>
+        <li><b>สถานะ:</b> {{ 'สำเร็จ' if report_data.ok else 'ล้มเหลว' }}</li>
+        <li><b>ฐานข้อมูลที่พบ:</b> {{ report_data.db_count }}</li>
+        <li><b>ส่งโดย:</b> {{ report_data.sender }}</li>
+        <li><b>เวลาที่ส่ง:</b> {{ report_data.sent_at }}</li>
+    </ul>
+
+    <p style="margin-top: 25px;">
+        คุณสามารถดาวน์โหลดรายงานฉบับเต็มในรูปแบบ PDF ได้จากลิงก์ด้านล่าง:
+    </p>
+    <a href="{{ report_data.pdf_download_url }}" 
+       style="display: inline-block; padding: 12px 20px; background-color: #007bff; color: #ffffff; text-decoration: none; border-radius: 5px;"
+    >ดาวน์โหลดรายงาน PDF</a>
+
+    <hr style="margin-top: 30px;">
+    <p style="font-size: 0.8em; color: #777;">
+        อีเมลนี้ถูกส่งโดยระบบอัตโนมัติ กรุณาอย่าตอบกลับ
+    </p>
+</body>
+</html>

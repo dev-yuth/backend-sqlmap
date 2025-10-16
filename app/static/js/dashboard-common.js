@@ -30,7 +30,7 @@ const DashboardCommon = {
             if (refreshed) {
                 const newCsrf = localStorage.getItem("access_csrf");
                 axios.defaults.headers.common['X-CSRF-TOKEN'] = newCsrf;
-                
+
                 if (retryCallback) {
                     retryCallback();
                 }
@@ -61,18 +61,19 @@ const DashboardCommon = {
 
     // สร้าง Badge สถานะ
     statusBadge(isSuccess) {
-        return isSuccess 
-            ? '<span class="badge badge-success">✅ Success</span>' 
+        return isSuccess
+            ? '<span class="badge badge-success">✅ Success</span>'
             : '<span class="badge badge-danger">❌ Failed</span>';
     },
 
     // สร้างปุ่ม PDF Download
     pdfButton(processId, hasPdf) {
         if (hasPdf) {
-            return `<a href="/api/processes/${processId}/pdf" class="btn btn-sm btn-primary" target="_blank">📄 ดาวน์โหลด</a>`;
+            return `<a href="/api/processes/${processId}/pdf" class="btn btn-sm btn-primary" target="_blank">📄</a>`;
         }
         return '-';
     },
+
 
     // โหลดข้อมูลจาก API
     async fetchData(endpoint, onSuccess, onError) {
@@ -88,6 +89,28 @@ const DashboardCommon = {
             throw err;
         }
     },
+
+    async postData(url, body, successCallback, errorCallback) {
+        try {
+          
+
+            const response = await axios({
+                method: 'POST',
+                url: url,
+                data: body // ใช้ 'data' ซึ่งเป็นวิธีที่ถูกต้องสำหรับ axios
+            });
+
+            if (successCallback) successCallback(response.data);
+
+        } catch (error) {
+            console.error(`Error in postData to ${url}:`, error.response || error);
+            if (errorCallback) {
+                const errorData = error.response ? error.response.data : { message: error.message };
+                errorCallback(errorData);
+            }
+        }
+    },
+
 
     // ตั้งค่า Auto Refresh
     setupAutoRefresh(callbacks, intervalMs = 60000) {
