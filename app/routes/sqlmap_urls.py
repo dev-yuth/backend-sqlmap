@@ -3,12 +3,13 @@ import os
 import json
 import shlex
 import re
+import uuid # ✅ เพิ่ม import ที่จำเป็น
 from typing import Any, Dict, List, Optional
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import subprocess
 import datetime
 
-from flask import Blueprint, request
+from flask import Blueprint, request, current_app # ✅ เพิ่ม current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 from app.config import get_python_path, get_sqlmap_path
@@ -18,7 +19,7 @@ from app.utils.pdf_generator import generate_sqlmap_pdf_report
 
 bp = Blueprint("sqlmap_urls", __name__)
 
-# --- regex / parsing helpers (kept functional) ---
+# --- (โค้ดส่วน helpers ทั้งหมดตั้งแต่ BLOCK_RE จนถึง _run_cmd ไม่มีการเปลี่ยนแปลง) ---
 BLOCK_RE = re.compile(r"---\n(Parameter:.*?)\n---", flags=re.DOTALL | re.IGNORECASE)
 PARAM_LINE_RE = re.compile(r"Parameter:\s*(?P<name>[\w\-\._]+)\s*(?:\((?P<loc>[^)]+)\))?", flags=re.IGNORECASE)
 
@@ -102,7 +103,6 @@ def extract_parameters_from_stdout(stdout: str) -> List[Dict[str, Any]]:
         results.append(parsed)
     return results
 
-# --- small utility helpers ---
 def _safe_int(v: Any, default: int) -> int:
     try:
         return int(v)
@@ -149,7 +149,6 @@ def validate_and_split_extra_args(extra_args_raw: Any) -> List[str]:
         i += 1
     return safe_tokens
 
-# --- command builder and runner ---
 def _build_cmd(python_path: str, sqlmap_path: str, url: str, options: Dict[str, Any]) -> List[str]:
     cmd: List[str] = [python_path, sqlmap_path, "-u", str(url), "--batch", "--dbs"]
     sqlmap_http_timeout = str(_safe_int(options.get("timeout"), 10))
@@ -237,9 +236,9 @@ def run_sqlmap_urls_post():
     python_path = get_python_path()
     sqlmap_path = get_sqlmap_path()
     
-    # Get current user ID
     current_user_id = get_jwt_identity()
 
+    # (ส่วนของการตั้งค่า default ต่างๆ ยังคงเหมือนเดิม)
     DEFAULT_MAX_CONCURRENCY = _safe_int(os.getenv("SQLMAP_MAX_CONCURRENCY"), 3)
     PROCESS_TIMEOUT = _safe_int(os.getenv("SQLMAP_PROCESS_TIMEOUT"), 300)
     default_timeout = _safe_int(os.getenv("SQLMAP_DEFAULT_TIMEOUT"), 15)
@@ -248,7 +247,6 @@ def run_sqlmap_urls_post():
     default_risk = _safe_int(os.getenv("SQLMAP_DEFAULT_RISK"), 1)
     smart_env = os.getenv("SQLMAP_DEFAULT_SMART", "1").lower()
     default_smart = smart_env in ("1", "true", "yes", "on")
-
     env_extra = os.getenv("SQLMAP_EXTRA_ARGS", "").strip()
     combined_extra = env_extra.split() if env_extra else []
     if "--passwords" not in combined_extra:
@@ -265,7 +263,7 @@ def run_sqlmap_urls_post():
         return {"ok": False, "error": "Missing or invalid 'cleaned_urls' (must be non-empty list)."}, 400
 
     create_pdf = body.get("createPdf", False)
-
+    
     try:
         requested = body.get("maxConcurrency")
         max_concurrency = int(requested) if requested is not None else DEFAULT_MAX_CONCURRENCY
@@ -282,9 +280,9 @@ def run_sqlmap_urls_post():
         "extraArgs": combined_extra_str,
     }
 
+    # (ส่วนของการรัน ThreadPoolExecutor ยังคงเหมือนเดิม)
     results: List[Dict[str, Any]] = []
     all_ok = True
-
     with ThreadPoolExecutor(max_workers=max_concurrency) as ex:
         future_to_index = {}
         for i, url in enumerate(raw_urls):
@@ -311,42 +309,65 @@ def run_sqlmap_urls_post():
     results_sorted = sorted(results, key=lambda x: x["index"])
     status_code = 200 if all_ok else 207
 
-    report_pdf_path = None
-    process_id_for_pdf = None 
-    if create_pdf:
-        try:
-            report_pdf_path = generate_sqlmap_pdf_report(results_sorted)
-                # ✅ บันทึก process ลง database
-            try:
-                process = ApiProcess(
-                    user_id=current_user_id,
-                    endpoint="/api/run-sqlmap-urls",
-                    payload_count=len(raw_urls),
-                    status_ok=all_ok,
-                    result_pdf=report_pdf_path,
-                    result_json=json.dumps(results_sorted, ensure_ascii=False)
-                )
-                db.session.add(process)
-                db.session.commit()
-                 # ✅ เมื่อ commit สำเร็จ เราจะได้ process.id มา
-                process_id_for_pdf = process.id
-            except Exception as e:
-                db.session.rollback()
-                print(f"❌ Error saving process to database: {e}")
-        except Exception as e:
-            return {"ok": False, "error": f"Report generation failed: {e}"}, 500
-
-
-
+    # --- CHANGE START: ปรับปรุงตรรกะการบันทึกไฟล์และ Database ---
+    process = None
     response = {
         "ok": all_ok,
         "count": len(raw_urls),
         "results": results_sorted,
     }
-    if report_pdf_path:
-        response["reportPdf"] = report_pdf_path
-    # ✅ เพิ่ม processId เข้าไปใน response ถ้ามี
-    if process_id_for_pdf:
-        response["processId"] = process_id_for_pdf
+    
+    try:
+        # 1. สร้าง Process record ก่อน เพื่อเอา ID (ยังไม่บันทึก path)
+        process = ApiProcess(
+            user_id=current_user_id,
+            endpoint="/api/run-sqlmap-urls",
+            payload_count=len(raw_urls),
+            status_ok=all_ok,
+        )
+        db.session.add(process)
+        # db.session.commit() # commit เพื่อให้ได้ process.id มาใช้งาน
+
+        # 2. กำหนด Path หลักสำหรับจัดเก็บ Report
+        base_reports_dir = os.path.join(current_app.static_folder, 'reports', 'sqlmap_urls')
+        
+        # 3. สร้างและบันทึกไฟล์ JSON (ทำเสมอ)
+        json_dir = os.path.join(base_reports_dir, 'json')
+        os.makedirs(json_dir, exist_ok=True)
+        json_filename = f"sqlmap_urls_results_{process.id}_{uuid.uuid4().hex}.json"
+        json_filepath = os.path.join(json_dir, json_filename)
+        with open(json_filepath, 'w', encoding='utf-8') as f:
+            json.dump(results_sorted, f, ensure_ascii=False, indent=4)
+        
+        # 4. กำหนด path ของ JSON ให้กับ object process
+        process.result_json = os.path.join('reports', 'sqlmap_urls', 'json', json_filename).replace('\\', '/')
+
+        # 5. ตรวจสอบว่าต้องการสร้าง PDF หรือไม่
+        if create_pdf:
+            try:
+                pdf_dir = os.path.join(base_reports_dir, 'pdf')
+                pdf_filename = f"sqlmap_urls_report_{process.id}_{uuid.uuid4().hex}.pdf"
+                
+                # เรียกใช้ฟังก์ชันสร้าง PDF
+                generate_sqlmap_pdf_report(results_sorted, output_dir=pdf_dir, output_filename=pdf_filename)
+                
+                # ✅ กำหนด path ของ PDF ให้กับ object process **หลังจากสร้างไฟล์สำเร็จแล้วเท่านั้น**
+                process.result_pdf = os.path.join('reports', 'sqlmap_urls', 'pdf', pdf_filename).replace('\\', '/')
+                response["reportPdf"] = process.result_pdf
+
+                # ✅ commit หลังจากสร้างไฟล์สำเร็จ
+                db.session.commit()
+            except Exception as e:
+                current_app.logger.error(f"PDF generation for sqlmap_urls failed for process {process.id}: {e}")
+
+        # 6. Commit การเปลี่ยนแปลงทั้งหมด (ทั้ง path ของ json และ pdf ถ้ามี) ลง DB
+        # db.session.commit()   
+        response["processId"] = process.id
+
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"❌ Error during sqlmap_urls process saving: {e}")
+        response["error"] = "Failed to save process results to database."
 
     return response, status_code
+# --- CHANGE END ---

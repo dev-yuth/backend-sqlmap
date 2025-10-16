@@ -68,25 +68,20 @@ def thai_datetime_str() -> str:
     return f"{d.day:02d} {months[d.month-1]} {d.year+543} เวลา {d.hour:02d}:{d.minute:02d} น."
 
 
-def generate_sqlmap_pdf_report(results: List[Dict[str, Any]], output_filename: str = None) -> str:
+def generate_sqlmap_pdf_report(results: List[Dict[str, Any]], output_dir: str, output_filename: str) -> str:
     """
     สร้างรายงาน PDF จากผลการสแกน SQLMap
     
     Args:
         results: รายการผลการสแกน (list of dict)
-        output_filename: ชื่อไฟล์ที่ต้องการ (ถ้าไม่ระบุจะสร้างอัตโนมัติ)
+        output_dir: โฟลเดอร์ที่ต้องการเก็บไฟล์ PDF (absolute path)
+        output_filename: ชื่อไฟล์ที่ต้องการ
     
     Returns:
         str: path แบบเต็มของไฟล์ PDF ที่สร้าง
     """
-    # กำหนดโฟลเดอร์สำหรับเก็บ PDF
-    output_dir = os.path.join(os.getcwd(), "app", "files")
+    # ตรวจสอบและสร้างโฟลเดอร์ถ้ายังไม่มี
     os.makedirs(output_dir, exist_ok=True)
-    
-    # สร้างชื่อไฟล์ถ้าไม่ได้ระบุ
-    if not output_filename:
-        timestamp = int(datetime.datetime.now().timestamp())
-        output_filename = f"sqlmap_report_{timestamp}.pdf"
     
     pdf_path = os.path.join(output_dir, output_filename)
 
@@ -265,7 +260,7 @@ def generate_simple_report(title: str, data: Dict[str, Any], output_filename: st
     Returns:
         str: path ของไฟล์ PDF
     """
-    output_dir = os.path.join(os.getcwd(), "app", "files")
+    output_dir = os.path.join(os.getcwd(), "app", "static", "reports", "general")
     os.makedirs(output_dir, exist_ok=True)
     
     if not output_filename:

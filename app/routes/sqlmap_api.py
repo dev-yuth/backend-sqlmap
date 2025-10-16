@@ -3,6 +3,7 @@ import os
 import json
 import shlex
 import re
+import uuid
 from typing import Any, Dict, List, Optional
 from urllib.parse import urlencode
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -19,7 +20,7 @@ from app.utils.pdf_generator import generate_sqlmap_pdf_report
 
 bp = Blueprint("sqlmap_api", __name__)
 
-# --- regex / helpers (same as original) ---
+# --- regex / helpers ---
 BLOCK_RE = re.compile(r"---\n(Parameter:.*?)\n---", flags=re.DOTALL | re.IGNORECASE)
 PARAM_LINE_RE = re.compile(r"Parameter:\s*(?P<name>[\w\-\._]+)\s*(?:\((?P<loc>[^)]+)\))?", flags=re.IGNORECASE)
 RESUMED_RE = re.compile(r"resumed:\s*'?(?P<val>[^']+)'?", flags=re.IGNORECASE)
@@ -133,7 +134,6 @@ def health():
 @bp.route("/api/run-sqlmap", methods=["POST"])
 @jwt_required(locations=["cookies"])
 def run_sqlmap():
-    # Get current user ID
     current_user_id = get_jwt_identity()
     
     try:
@@ -299,7 +299,6 @@ def run_sqlmap():
     # Batch support (list body)
     # -------------------------
     if isinstance(body, list):
-        # Determine createPdf flag
         create_pdf = False
         qv = request.args.get("createPdf")
         if qv is not None and str(qv).lower() in ("1", "true", "yes", "on"):
@@ -307,12 +306,13 @@ def run_sqlmap():
         elif body and isinstance(body[0], dict) and body[0].get("createPdf"):
             create_pdf = True
 
-        requested_max_concurrency = body[0].get("maxConcurrency") if body and isinstance(body[0], dict) else None
         try:
+            requested_max_concurrency = body[0].get("maxConcurrency") if body and isinstance(body[0], dict) else None
             max_concurrency = int(request.args.get("maxConcurrency") or requested_max_concurrency or DEFAULT_MAX_CONCURRENCY)
         except Exception:
             max_concurrency = DEFAULT_MAX_CONCURRENCY
         max_concurrency = max(1, min(len(body), max_concurrency))
+        
         results: List[Dict[str, Any]] = []
         all_ok = True
         with ThreadPoolExecutor(max_workers=max_concurrency) as ex:
@@ -327,36 +327,53 @@ def run_sqlmap():
                 results.append(entry)
                 if not result.get("ok", False):
                     all_ok = False
+        
         results_sorted = sorted(results, key=lambda x: x["index"])
-
         response = {"ok": all_ok, "results": results_sorted}
         status_code = 200 if all_ok else 207
 
-        report_pdf_path = None
-        if create_pdf:
-            try:
-                report_pdf_path = generate_sqlmap_pdf_report(results_sorted)
-                response["reportPdf"] = report_pdf_path
-            except Exception as e:
-                return {"ok": False, "error": f"Report generation failed: {e}"}, 500
-
-        # ✅ บันทึก process ลง database
+        # --- ส่วนจัดการไฟล์และฐานข้อมูล ---
+        process = None
         try:
             process = ApiProcess(
                 user_id=current_user_id,
                 endpoint="/api/run-sqlmap (batch)",
                 payload_count=len(body),
-                status_ok=all_ok,
-                result_pdf=report_pdf_path,
-                result_json=json.dumps(results_sorted, ensure_ascii=False)
+                status_ok=all_ok
             )
             db.session.add(process)
             db.session.commit()
-            # ✅ ส่ง ID กลับไปใน response
+
+            base_reports_dir = os.path.join(current_app.static_folder, 'reports', 'sqlmap_basic')
+            
+            json_dir = os.path.join(base_reports_dir, 'json')
+            os.makedirs(json_dir, exist_ok=True)
+            json_filename = f"sqlmap_results_{process.id}_{uuid.uuid4().hex}.json"
+            json_filepath = os.path.join(json_dir, json_filename)
+            with open(json_filepath, 'w', encoding='utf-8') as f:
+                json.dump(results_sorted, f, ensure_ascii=False, indent=4)
+            
+            process.result_json = os.path.join('reports', 'sqlmap_basic', 'json', json_filename).replace('\\', '/')
+
+            if create_pdf:
+                try:
+                    pdf_dir = os.path.join(base_reports_dir, 'pdf')
+                    pdf_filename = f"sqlmap_report_{process.id}_{uuid.uuid4().hex}.pdf"
+                    
+                    generate_sqlmap_pdf_report(results_sorted, output_dir=pdf_dir, output_filename=pdf_filename)
+                    
+                    process.result_pdf = os.path.join('reports', 'sqlmap_basic', 'pdf', pdf_filename).replace('\\', '/')
+                    response["reportPdf"] = process.result_pdf
+                except Exception as e:
+                    current_app.logger.error(f"PDF generation failed for process {process.id}: {e}")
+            
+            db.session.commit()
             response["processId"] = process.id
+
         except Exception as e:
             db.session.rollback()
-            print(f"❌ Error saving process to database: {e}")
+            current_app.logger.error(f"❌ Error saving process to database: {e}")
+            return {"ok": False, "error": "Failed to save scan process to database."}, 500
 
         return response, status_code
 
@@ -366,7 +383,6 @@ def run_sqlmap():
     if not isinstance(body, dict):
         return {"ok": False, "error": "Request body must be an object or list"}, 400
 
-    # Check if single-request asks for PDF
     create_pdf_single = False
     qv_single = request.args.get("createPdf")
     if qv_single is not None and str(qv_single).lower() in ("1", "true", "yes", "on"):
@@ -376,34 +392,48 @@ def run_sqlmap():
 
     result = run_one(body)
     status = 200 if result.get("ok", False) else 500
+    
+    # --- ส่วนจัดการไฟล์และฐานข้อมูล (Single) ---
+    process = None
+    try:
+        process = ApiProcess(
+            user_id=current_user_id,
+            endpoint="/api/run-sqlmap (single)",
+            payload_count=1,
+            status_ok=result.get("ok", False)
+        )
+        db.session.add(process)
+        db.session.commit()
 
-    report_pdf_path_single = None
-    # If PDF requested for single item, wrap into list and generate
-    if create_pdf_single:
-        try:
-            wrapped = [{"index": 0, "url": body.get("url"), **result}]
-            report_pdf_path_single = generate_sqlmap_pdf_report(wrapped)
-            result["reportPdf"] = report_pdf_path_single
+        base_reports_dir = os.path.join(current_app.static_folder, 'reports', 'sqlmap_basic')
+        wrapped_result = [{"index": 0, "url": body.get("url"), **result}]
 
-                # ✅ บันทึก process ลง database (single)
+        json_dir = os.path.join(base_reports_dir, 'json')
+        os.makedirs(json_dir, exist_ok=True)
+        json_filename = f"sqlmap_results_{process.id}_{uuid.uuid4().hex}.json"
+        json_filepath = os.path.join(json_dir, json_filename)
+        with open(json_filepath, 'w', encoding='utf-8') as f:
+            json.dump(wrapped_result, f, ensure_ascii=False, indent=4)
+        process.result_json = os.path.join('reports', 'sqlmap_basic', 'json', json_filename).replace('\\', '/')
+
+        if create_pdf_single:
             try:
-                process = ApiProcess(
-                    user_id=current_user_id,
-                    endpoint="/api/run-sqlmap (single)",
-                    payload_count=1,
-                    status_ok=result.get("ok", False),
-                    result_pdf=report_pdf_path_single,
-                    result_json=json.dumps([result], ensure_ascii=False)
-                )
-                db.session.add(process)
-                db.session.commit()
+                pdf_dir = os.path.join(base_reports_dir, 'pdf')
+                pdf_filename = f"sqlmap_report_{process.id}_{uuid.uuid4().hex}.pdf"
+                
+                generate_sqlmap_pdf_report(wrapped_result, output_dir=pdf_dir, output_filename=pdf_filename)
+                
+                process.result_pdf = os.path.join('reports', 'sqlmap_basic', 'pdf', pdf_filename).replace('\\', '/')
+                result["reportPdf"] = process.result_pdf
             except Exception as e:
-                db.session.rollback()
-                print(f"❌ Error saving process to database: {e}")
+                current_app.logger.error(f"Single PDF generation failed for process {process.id}: {e}")
 
-        except Exception as e:
-            return {"ok": False, "error": f"Report generation failed: {e}"}, 500
+        db.session.commit()
+        result["processId"] = process.id
 
-
+    except Exception as e:
+        db.session.rollback()
+        current_app.logger.error(f"❌ Error saving single process to database: {e}")
+        return {"ok": False, "error": "Failed to save scan process to database."}, 500
 
     return result, status
