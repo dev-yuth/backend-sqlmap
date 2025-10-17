@@ -71,7 +71,7 @@ const DashboardCommon = {
         if (hasPdf) {
             return `<a href="/api/processes/${processId}/pdf" class="btn btn-sm btn-primary" target="_blank">📄</a>`;
         }
-        return '-';
+        return '';
     },
 
 
